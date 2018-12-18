@@ -48,7 +48,7 @@ def write_dot_file(input_file, output_file):
 
 
 def print_help():
-    body = '[-c] <input_file> <output_file>'
+    body = '[-c] <input_file> [output_file]'
     print("python3 {} {}".format(__file__, body))
 
 def main():
