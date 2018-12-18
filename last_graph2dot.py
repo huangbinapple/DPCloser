@@ -34,7 +34,7 @@ def write_dot_file(input_file, output_file):
         for node_id, seq_len in seq_lens.items():
             node_label = ', '.join((node_id, str(seq_len)))
             node_size = calc_node_size(seq_len)
-            fout.addNode(node_id,
+            fout.add_node(node_id,
                     {'label': node_label, 'fixedsize': 'true',
                         'height': str(node_size / 2), 'width': str(node_size)}
                     )
@@ -44,7 +44,7 @@ def write_dot_file(input_file, output_file):
             # write a edge in dot file.
             edge_colors = ['red;0.5' if ele < 0 else 'green;0.5' for ele in edge]
             edge_labels = [str(abs(ele)) for ele in edge]
-            fout.addEdge(*edge_labels, {"color":':'.join(edge_colors)})
+            fout.add_edge(*edge_labels, {"color":':'.join(edge_colors)})
 
 
 def print_help():
