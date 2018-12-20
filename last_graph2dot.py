@@ -3,7 +3,7 @@ import getopt
 import subprocess
 import math
 
-import dotFile
+import dot_file
 
 BASE = 60
 K = 0.5
@@ -29,7 +29,7 @@ def write_dot_file(input_file, output_file):
                 continue
 
     # Write dot.
-    with dotFile.DotFile(output_file) as fout:
+    with dot_file.DotFile(output_file) as fout:
         # Write nodes.
         for node_id, seq_len in seq_lens.items():
             node_label = ', '.join((node_id, str(seq_len)))
