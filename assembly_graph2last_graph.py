@@ -25,7 +25,6 @@ def write_last_graph(nodes, output_file, overlap_size):
             fout.write('\t'.join(['NODE', node_id, str(node_obj.length - overlap_size),
                 str(num_kmer), str(num_kmer), '0', '0']))
             fout.write('\n')
-            print(node_id_reverse.rstrip('r'), node_id)
             assert node_id_reverse.rstrip('r') == node_id
             fout.write(node_obj.seq[overlap_size:])
             fout.write('\n')
