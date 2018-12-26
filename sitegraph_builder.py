@@ -8,33 +8,33 @@ import site_graph
 
 
 BIONANO_SITE = 'GCTCTTC', 'GAAGAGC'
-# BIONANO_SITE = 'GA', 'TC'
 
-def _findAllHelper(string, keyword, result):
+def _find_all_helper(string, keyword, result):
     hitIndex = string.find(keyword)
     while hitIndex >= 0:
         result.append(hitIndex)
         hitIndex = string.find(keyword, hitIndex+1)
 
-def findAll(string, keywords):
+def find_all(string, keywords):
     result = []
     for keyword in keywords:
-        _findAllHelper(string, keyword, result)
+        _find_all_helper(string, keyword, result)
     result.sort()
     return result
 
-def testFindAll():
-    string = "AATCCCCCCCTCACCGCCATATTTAAAGAAGAGCTCGTACGAAAGTACGGGCTTTTTTTTCGTATATTGCACACACCGGGGGGATGAGAAGCCCCGACCGGGGTTCGACAACTGGCGACAGCCAGTTGGACAGACCGTGAACGCAGTGAGCGGGCTGCCCGCAGGGCGAGCGAAGCGAGTCAATCCCCCCCTCACCGCCATATTTAAAGAAGAGCTCGTACGAAAGTACGGGCTTTTTTTTCGTATATTGCACACACCGGG"
+def test_find_all():
+    # BIONANO_SITE = 'GA', 'TC'
+    # string = "AATCCCCCCCTCACCGCCATATTTAAAGAAGAGCTCGTACGAAAGTACGGGCTTTTTTTTCGTATATTGCACACACCGGGGGGATGAGAAGCCCCGACCGGGGTTCGACAACTGGCGACAGCCAGTTGGACAGACCGTGAACGCAGTGAGCGGGCTGCCCGCAGGGCGAGCGAAGCGAGTCAATCCCCCCCTCACCGCCATATTTAAAGAAGAGCTCGTACGAAAGTACGGGCTTTTTTTTCGTATATTGCACACACCGGG"
     string_ic = "CCCGGTGTGTGCAATATACGAAAAAAAAGCCCGTACTTTCGTACGAGCTCTTCTTTAAATATGGCGGTGAGGGGGGGATTGACTCGCTTCGCTCGCCCTGCGGGCAGCCCGCTCACTGCGTTCACGGTCTGTCCAACTGGCTGTCGCCAGTTGTCGAACCCCGGTCGGGGCTTCTCATCCCCCCGGTGTGTGCAATATACGAAAAAAAAGCCCGTACTTTCGTACGAGCTCTTCTTTAAATATGGCGGTGAGGGGGGGATT"
-    print(findAll(string_ic, BIONANO_SITE))
+    print(find_all(string_ic, BIONANO_SITE))
 
-def inferSitePositionInReverseComplement(position, seq_length, key_word_length):
+def infer_site_position_in_reverse_complement(position, seq_length, key_word_length):
     return seq_length - key_word_length - position
 
-def inferSitePositionInChild(position, parent_length, overlap_length):
+def infer_site_position_in_child(position, parent_length, overlap_length):
     return position - (parent_length - overlap_length)
 
-def isSiteInOverlap(position, node_len, over_lap_len):
+def is_site_in_overlap(position, node_len, over_lap_len):
     return position >= (node_len - over_lap_len)
 
 def get_node_ic(node, nodes):
@@ -47,11 +47,11 @@ def get_site_ic(site, sites):
     result_site_id = site.id[:-1] if site.id.endswith('r') else site.id + 'r'
     return sites[result_site_id]
 
-def addSitesToNodePair(node, site_position_indexs, min_id_avalable, nodes, sites):
+def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, sites):
     node_ic = get_node_ic(node, nodes)
 
     # Find positions, if there is none, return.
-    site_positions = findAll(node.seq, BIONANO_SITE)
+    site_positions = find_all(node.seq, BIONANO_SITE)
     if site_positions:
         position_index, position_index_ic = {}, {}
         site_position_indexs[node] = position_index
@@ -61,7 +61,7 @@ def addSitesToNodePair(node, site_position_indexs, min_id_avalable, nodes, sites
             new_site_id = str(min_id_avalable)
             new_site = Site(new_site_id)
             new_site_ic = Site(new_site_id + 'r')
-            site_position_ic = inferSitePositionInReverseComplement(site_position, node.length, len(BIONANO_SITE[0]))
+            site_position_ic = infer_site_position_in_reverse_complement(site_position, node.length, len(BIONANO_SITE[0]))
             
             # Register new site(_ic) in `position_index`(_ic) & `sites`.
             position_index[site_position] = new_site
@@ -75,17 +75,17 @@ def addSitesToNodePair(node, site_position_indexs, min_id_avalable, nodes, sites
         for node_, position_index_ in ((node, position_index), (node_ic, position_index_ic)):
             positions, sites_in_order = zip(*sorted(list(position_index_.items())))
             for i in range(len(sites_in_order) - 1):
-                sites_in_order[i].addChild(sites_in_order[i + 1], positions[i + 1] - positions[i], [node_])
+                sites_in_order[i].add_child(sites_in_order[i + 1], positions[i + 1] - positions[i], [node_])
     return len(site_positions)
 
-def buildSiteGraph(nodes, mode=0):
+def build_site_graph(nodes, mode=0):
     print('len of nodes:', len(nodes))
     sites = {}
     site_position_index = {}
     node_id = 0
     for node in filter(lambda x: x.uid[-1] != 'r', sorted(nodes.values(), key=lambda x: x.uid)):
         node_ic = get_node_ic(node, nodes)
-        num_sites_added = addSitesToNodePair(node, site_position_index, node_id, nodes, sites)
+        num_sites_added = add_sites_to_node_pair(node, site_position_index, node_id, nodes, sites)
         node_id += num_sites_added
         if num_sites_added:
             print('add {} site(s) in node {}, {}'.format(num_sites_added, node.uid, node_ic.uid))
@@ -122,7 +122,7 @@ def buildSiteGraph(nodes, mode=0):
                         min_child_site_position = overlap_len - len(BIONANO_SITE[0])  # Child_site's position should > this number.
                         for child_site_position, child_site in child_site_positions:
                             if child_site_position > min_child_site_position:
-                                max_position_site.addChild(child_site, interval + child_site_position - overlap_len + 1,
+                                max_position_site.add_child(child_site, interval + child_site_position - overlap_len + 1,
                                         node_path + [child_node])
                                 print('Add a child to {}'.format(max_position_site.id), '*' * (len(node_path) + 1))
                                 to_continue = True
@@ -138,12 +138,13 @@ def buildSiteGraph(nodes, mode=0):
             
     return sites, site_position_index
 
-def _testBuildSiteGraph():
+def _test_build_site_graph():
     input_file = 'assembly_graph.fastg'
     # input_file = 'test.fastg'
-    nodes = fastg_file.buildAssemblyGraph(input_file, overlap)
-    # nodes = fastg_file.buildAssemblyGraph(input_file, overlap=2)
-    sites, site_position_index = buildSiteGraph(nodes)
+    overlap = 127
+    nodes = fastg_file.build_assembly_graph(input_file, overlap)
+    # nodes = fastg_file.build_assembly_graph(input_file, overlap=2)
+    sites, site_position_index = build_site_graph(nodes)
     num_position_in_index = sum((len(ele) for ele in site_position_index.values()))
     site_ids = [int(site.id) for site in sites.values() if not site.id.endswith('r')]
     site_ids.sort()
@@ -184,7 +185,9 @@ def _testBuildSiteGraph():
 
 
 def printHelpMessage():
-    print('python3 {} [-h]  -i <fastg file> -l <overlap_len> -o <siteGraph file>')
+    body = '[-h] <-i fastg file> <-l overlap_len> <-o site_graph file>'
+    print('python3 {} {}'.format(__file__, body))
+
 
 def main():
     input_file = ''
@@ -205,12 +208,12 @@ def main():
             printHelpMessage()
             sys.exit()
 
-    nodes = fastg_file.buildAssemblyGraph(input_file, overlap=overlap_len)
-    sites, site_position_index = buildSiteGraph(nodes)
+    nodes = fastg_file.build_assembly_graph(input_file, overlap=overlap_len)
+    sites, site_position_index = build_site_graph(nodes)
     # TODO: Add simplify site graph step.
     print('{} sites created on {} nodes'.format(len(sites), len(site_position_index)))
 
-    site_graph.writeFile(output_file, sites,
+    site_graph.write_file(output_file, sites,
             [' '.join(sys.argv),
              'Number of sites: {}'.format(len(sites)),
              'Number of nodes: {}'.format(len(nodes)),

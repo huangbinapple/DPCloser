@@ -7,15 +7,17 @@ class Site:
         self.id = id_
         self.children = []
 
-    def addChild(self, child_site, interval, nodes_path, contamination_info=None):
+    def add_child(self, child_site, interval, nodes_path, contamination_info=None):
         """
         Arguments: 
             child_site(Site): site that can be reach form current site.
-            interval(int): Steps to take from the first base of start site to the first base of end site.    
-            nodes_path(list[assembly_graph.Node]): length 1 or >1, when 1, it's it means there is no jump between nodes.
-                when >2,  there are jump(s), the first and last node are nodes before and after jump(s)
-            contamination_info(list[bool]): each element correspond to a ele in `node_path`, indicate whether that node is 
-                contaminated, if it is, then that node's seq is replace by N.
+            interval(int): Steps to take from the first base of start site to the
+                first base of end site.    
+            nodes_path(list[assembly_graph.Node]): length 1 or >1, when 1, it's it means
+                there is no jump between nodes. When >2,  there are jump(s), the first and
+                last node are nodes before and after jump(s)
+            contamination_info(list[bool]): each element correspond to a ele in `node_path`, 
+                indicate whether that node is contaminated, if it is, then that node's seq is replace by N.
         """
         if not contamination_info:
             contamination_info = [False] * len(nodes_path)
@@ -55,7 +57,7 @@ def simplify_site_graph(sites):
     print('Simplified site graph: {} -> {}'.format(num_edge_original, num_edge_later))
     return sites
 
-def readFile(file_name, nodes):
+def read_file(file_name, nodes):
     fin = open(file_name)
     memory = {}
     sites = {}
@@ -89,17 +91,17 @@ def readFile(file_name, nodes):
     print('Load {} sites.'.format(len(sites)))
     return sites
 
-def _testReadFile():
+def _test_read_file():
     input_file = 'assembly_graph.siteGraph'
     fastg_file_ = 'assembly_graph.fastg'
     import fastg_file
-    nodes = fastg_file.buildAssemblyGraph(fastg_file_, 127)
-    sites = readFile(input_file, nodes)
+    nodes = fastg_file.build_assembly_graph(fastg_file_, 127)
+    sites = read_file(input_file, nodes)
     for site in sites.values():
         print(site.id)
         print([(ele[0], ele[1]) for ele in site.children])
 
-def writeFile(file_name, sites, comment_list):
+def write_file(file_name, sites, comment_list):
     fout = open(file_name, 'w')
 
     # Write commons
@@ -127,4 +129,4 @@ def writeFile(file_name, sites, comment_list):
 
 
 if __name__ == '__main__':
-    _testReadFile()
+    _test_read_file()
