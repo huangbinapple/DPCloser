@@ -193,7 +193,8 @@ def main():
     input_file = ''
     output_file = ''
     overlap_len = None
-    options, args = getopt.getopt(sys.argv[1:], 'i:l:o:h')
+    to_simplify = False
+    options, args = getopt.getopt(sys.argv[1:], 'i:l:o:hs')
     for option, value in options:
         if option == '-i':
             input_file = value
@@ -201,6 +202,8 @@ def main():
             output_file = value
         elif option == '-l':
             overlap_len = int(value)
+        elif option == '-s':
+            to_simplify = True
         elif option == '-h':
             printHelpMessage()
             sys.exit()
@@ -210,7 +213,9 @@ def main():
 
     nodes = fastg_file.build_assembly_graph(input_file, overlap=overlap_len)
     sites, site_position_index = build_site_graph(nodes)
-    # TODO: Add simplify site graph step.
+    if to_simplify:
+        print('Simplifying site graph...')
+        sites = site_graph.simplify_site_graph(sites)
     print('{} sites created on {} nodes'.format(len(sites), len(site_position_index)))
 
     site_graph.write_file(output_file, sites,
