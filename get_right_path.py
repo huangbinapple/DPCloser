@@ -28,6 +28,8 @@ class Alignment:
         # num_error = int(tokens[4])
         self.gap_open = int(tokens[5])
         q_start, q_end, s_start, s_end = map(int, tokens[6:10])
+        self.start_cut = q_start - 1
+        self.end_cut = query_node_len - q_end
         self.num_delete = alignment_length - (abs(q_start - q_end) + 1)
         self.num_insert = alignment_length - (abs(s_start - s_end) + 1)
         self.e_value = float(tokens[10])
@@ -64,16 +66,20 @@ class Alignment:
                 print(self.end)
                 print(shift)
                 print(alignment.start, min_insert, min_delete)
-            return alignment.start - min_insert <= self.end - shift <= \
-                alignment.start + min_delete
+            real_self_end = self.end + self.end_cut
+            result_other_start = alignment.start - alignment.start_cut
+            return result_other_start  - min_insert <= \
+                real_self_end - shift <= result_other_start + min_delete
         else:
             if debug:
                 print('backward')
                 print(self.end)
                 print(shift)
                 print(alignment.start, min_delete, min_insert)
-            return alignment.start - min_delete <= self.end + shift <= \
-                alignment.start + min_insert
+            real_self_end = self.end - self.end_cut
+            real_other_start = alignment.start + alignment.start_cut
+            return real_other_start - min_delete <= \
+                real_self_end + shift <= real_other_start + min_insert
 
     @classmethod
     def index(cls, alignments, key):
@@ -81,6 +87,8 @@ class Alignment:
             key_attr = 'query_node_id'
         elif key == 'start position':
             key_attr = 'start'
+        else:
+            raise ValueError('Key not supported.')
         index = {}
         for alignemnt in alignments:
             if getattr(alignemnt, key_attr) in index:
@@ -88,6 +96,42 @@ class Alignment:
             else:
                 index[getattr(alignemnt, key_attr)] = [alignemnt]
         return index
+
+    @classmethod
+    def add_connection(cls, alignments, nodes):
+        """Only for those forward alignments"""
+        debug = False
+        alignments = list(filter(lambda x: x.is_forward, alignments))
+        # Sort method.
+        alignments.sort(key=lambda x: x.start)
+        for i in range(len(alignments)):
+            if alignments[i].query_node_id == '253624r':
+                debug = True
+            for child_node, overlap in\
+                    nodes[alignments[i].query_node_id].children:
+                stop_position = alignments[i].end - (overlap - 1) + 50
+                if debug:
+                    print('stop position:', stop_position)
+                j = i + 1
+                if debug:
+                    print(alignments[j].line)
+                    print('start:', alignments[j].start)
+                while j < len(alignments) and alignments[j].start < stop_position:
+                    if debug:
+                        print('hello1')
+                        print(alignments[i].num_insert, alignments[i].num_delete)
+                        print(alignments[j].num_insert, alignments[j].num_delete)
+                    if alignments[j].query_node_id == child_node.uid and \
+                            alignments[i].adjacent_before(alignments[j], overlap):
+                        if debug:
+                            print('hello2')
+                        if debug:
+                            print('start:', alignments[j].start)
+                        if debug and alignments[j].query_node_id == '253606':
+                            print('HELLO')
+                        alignments[i].add_child(alignments[j])
+                    j += 1
+            debug = False
 
 def read_file(file_name):
     alignemnts = []
@@ -106,28 +150,16 @@ def is_adjacent(node_a, node_b, node_id2alignments, overlap,
             return True
     return False
 
-def write_file(output_file, node_id2alignments, nodes, overlap):
-    debug = False
+def write_file(output_file, alignments):
+    print(len(alignments))
     fout = open(output_file, 'w')
-    for node_id, node in nodes.items():
-        if debug:
-            for alignement in node_id2alignments[node_id]:
-                fout.write(alignement.line)
-        fout.write('NODE: ' + node_id)
+    for alignment in alignments:
+        fout.write(alignment.line)
+        for child in alignment.children:
+            fout.write('\t')
+            fout.write(child.line)
         fout.write('\n')
-        for child_node, overlap in node.children:
-            if debug:
-                for alignement in node_id2alignments[child_node.uid]:
-                    fout.write(alignement.line)
-            fout.write('\t'.join(('', child_node.uid, str(overlap),
-                'O' if is_adjacent(node_id, child_node.uid,
-                    node_id2alignments, overlap, debug) else 'X')
-                ))
-            fout.write('\n')
-        fout.write('\n')
-        debug = False
     fout.close()
-
 
 def printHelpMessage():
     body = '[-h] <-l overlap len> <fastg file> <blast result> <output>'
@@ -151,12 +183,11 @@ def main():
     fastg_file_name, blast_result_file, output_file = args
 
     nodes = fastg_file.build_assembly_graph(fastg_file_name, overlap_len)
-    node_id2alignments = Alignment.index(
-        filter(lambda x: x.is_valid, read_file(blast_result_file)),
-        'node id'
-    ) 
-
-    write_file(output_file, node_id2alignments, nodes, overlap_len)
+    alignments = list(filter(lambda x: x.is_valid and x.is_forward,
+        read_file(blast_result_file)))
+    Alignment.add_connection(alignments, nodes)
+    alignments.sort(key=lambda x: x.start)
+    write_file(output_file, alignments)
 
 if __name__ == '__main__':
     main()
