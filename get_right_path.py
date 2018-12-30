@@ -47,12 +47,9 @@ class Alignment:
     def add_child(self, alignemnt):
         self.children.append(alignemnt)
 
-    def adjacent_before(self, alignment, overlap, debug=False):
+    def adjacent_before(self, alignment, overlap):
         """This mean self is adjacent to `alignment` and 
         `self` is on the upper stream of `alignment`."""
-        if debug:
-            print(self.line.rstrip())
-            print(alignment.line.rstrip())
         min_insert = min(self.num_insert, alignment.num_insert)
         min_delete = min(self.num_delete, alignment.num_delete)
         # To be True, two alignment must have the same direction.
@@ -61,21 +58,11 @@ class Alignment:
         if not is_same_direction:
             return False
         if self.is_forward:
-            if debug:
-                print('forward')
-                print(self.end)
-                print(shift)
-                print(alignment.start, min_insert, min_delete)
             real_self_end = self.end + self.end_cut
             result_other_start = alignment.start - alignment.start_cut
             return result_other_start  - min_insert <= \
                 real_self_end - shift <= result_other_start + min_delete
         else:
-            if debug:
-                print('backward')
-                print(self.end)
-                print(shift)
-                print(alignment.start, min_delete, min_insert)
             real_self_end = self.end - self.end_cut
             real_other_start = alignment.start + alignment.start_cut
             return real_other_start - min_delete <= \
@@ -100,38 +87,19 @@ class Alignment:
     @classmethod
     def add_connection(cls, alignments, nodes):
         """Only for those forward alignments"""
-        debug = False
         alignments = list(filter(lambda x: x.is_forward, alignments))
         # Sort method.
         alignments.sort(key=lambda x: x.start)
         for i in range(len(alignments)):
-            if alignments[i].query_node_id == '253624r':
-                debug = True
             for child_node, overlap in\
                     nodes[alignments[i].query_node_id].children:
                 stop_position = alignments[i].end - (overlap - 1) + 50
-                if debug:
-                    print('stop position:', stop_position)
                 j = i + 1
-                if debug:
-                    print(alignments[j].line)
-                    print('start:', alignments[j].start)
                 while j < len(alignments) and alignments[j].start < stop_position:
-                    if debug:
-                        print('hello1')
-                        print(alignments[i].num_insert, alignments[i].num_delete)
-                        print(alignments[j].num_insert, alignments[j].num_delete)
                     if alignments[j].query_node_id == child_node.uid and \
                             alignments[i].adjacent_before(alignments[j], overlap):
-                        if debug:
-                            print('hello2')
-                        if debug:
-                            print('start:', alignments[j].start)
-                        if debug and alignments[j].query_node_id == '253606':
-                            print('HELLO')
                         alignments[i].add_child(alignments[j])
                     j += 1
-            debug = False
 
 def read_file(file_name):
     alignemnts = []
@@ -142,16 +110,14 @@ def read_file(file_name):
             alignemnts.append(alignemnt)
     return alignemnts
 
-def is_adjacent(node_a, node_b, node_id2alignments, overlap,
-        debug=False):
+def is_adjacent(node_a, node_b, node_id2alignments, overlap):
     for alignment_a, alignment_b in itertools.product(
             node_id2alignments[node_a], node_id2alignments[node_b]):
-        if alignment_a.adjacent_before(alignment_b, overlap, debug):
+        if alignment_a.adjacent_before(alignment_b, overlap):
             return True
     return False
 
 def write_file(output_file, alignments):
-    print(len(alignments))
     fout = open(output_file, 'w')
     for alignment in alignments:
         fout.write(alignment.line)
