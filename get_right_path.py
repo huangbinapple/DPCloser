@@ -93,11 +93,16 @@ class Alignment:
         for i in range(len(alignments)):
             for child_node, overlap in\
                     nodes[alignments[i].query_node_id].children:
-                stop_position = alignments[i].end - (overlap - 1) + 50
+                safe_margin = 50
+                stop_position = alignments[i].end - (overlap - 1) + \
+                    safe_margin
                 j = i + 1
-                while j < len(alignments) and alignments[j].start < stop_position:
-                    if alignments[j].query_node_id == child_node.uid and \
-                            alignments[i].adjacent_before(alignments[j], overlap):
+                while j < len(alignments) and \
+                        alignments[j].start < stop_position:
+                    if alignments[j].query_node_id == \
+                            child_node.uid and \
+                            alignments[i].adjacent_before(alignments[j],
+                                overlap):
                         alignments[i].add_child(alignments[j])
                     j += 1
 
@@ -148,7 +153,8 @@ def main():
             sys.exit()
     fastg_file_name, blast_result_file, output_file = args
 
-    nodes = fastg_file.build_assembly_graph(fastg_file_name, overlap_len)
+    nodes = fastg_file.build_assembly_graph(fastg_file_name,
+        overlap_len)
     alignments = list(filter(lambda x: x.is_valid and x.is_forward,
         read_file(blast_result_file)))
     Alignment.add_connection(alignments, nodes)
