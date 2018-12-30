@@ -75,22 +75,28 @@ class Alignment:
             return alignment.start - min_delete <= self.end + shift <= \
                 alignment.start + min_insert
 
+    @classmethod
+    def index(cls, alignments, key):
+        if key == 'node id':
+            key_attr = 'query_node_id'
+        elif key == 'start position':
+            key_attr = 'start'
+        index = {}
+        for alignemnt in alignments:
+            if getattr(alignemnt, key_attr) in index:
+                index[getattr(alignemnt, key_attr)].append(alignemnt)
+            else:
+                index[getattr(alignemnt, key_attr)] = [alignemnt]
+        return index
+
 def read_file(file_name):
-    node_id2alignments = {}
+    alignemnts = []
     with open(file_name) as fin:
         for line in filter(lambda x: not x.startswith('#'), fin):
             # Parse a line.
             alignemnt = Alignment(line)
-            if not alignemnt.is_valid:
-                continue
-            if alignemnt.query_node_id in node_id2alignments:
-                node_id2alignments[alignemnt.query_node_id].append(
-                    alignemnt
-                )
-            else:
-                node_id2alignments[alignemnt.query_node_id] =\
-                    [alignemnt]
-    return node_id2alignments
+            alignemnts.append(alignemnt)
+    return alignemnts
 
 def is_adjacent(node_a, node_b, node_id2alignments, overlap,
         debug=False):
@@ -145,9 +151,12 @@ def main():
     fastg_file_name, blast_result_file, output_file = args
 
     nodes = fastg_file.build_assembly_graph(fastg_file_name, overlap_len)
+    node_id2alignments = Alignment.index(
+        filter(lambda x: x.is_valid, read_file(blast_result_file)),
+        'node id'
+    ) 
 
-    write_file(output_file, read_file(blast_result_file),
-        nodes, overlap_len)
+    write_file(output_file, node_id2alignments, nodes, overlap_len)
 
 if __name__ == '__main__':
     main()
