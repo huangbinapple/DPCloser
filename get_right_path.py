@@ -41,7 +41,7 @@ class Alignment:
             self.identity > Alignment.VALID_THRESHOLD else False
         self.is_forward = s_end > s_start
 
-    def adjacent_before(self, alignment, overlap=0, debug=False):
+    def adjacent_before(self, alignment, overlap, debug=False):
         """This mean self is adjacent to `alignment` and 
         `self` is on the upper stream of `alignment`."""
         if debug:
