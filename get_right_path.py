@@ -40,6 +40,10 @@ class Alignment:
         self.is_valid = True if\
             self.identity > Alignment.VALID_THRESHOLD else False
         self.is_forward = s_end > s_start
+        self.children = []
+
+    def add_child(self, alignemnt):
+        self.children.append(alignemnt)
 
     def adjacent_before(self, alignment, overlap, debug=False):
         """This mean self is adjacent to `alignment` and 
