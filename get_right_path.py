@@ -52,10 +52,12 @@ class Alignment:
         `self` is on the upper stream of `alignment`."""
         min_insert = min(self.num_insert, alignment.num_insert)
         min_delete = min(self.num_delete, alignment.num_delete)
-        # To be True, two alignment must have the same direction.
-        is_same_direction = (self.is_forward == alignment.is_forward)
+        # To be True, two alignment must be in the same ref and have
+        # the same direction.
+        is_same_dir = (self.is_forward == alignment.is_forward and
+            self.subject_id == alignment.subject_id)
         shift = overlap - 1
-        if not is_same_direction:
+        if not is_same_dir:
             return False
         if self.is_forward:
             real_self_end = self.end + self.end_cut
