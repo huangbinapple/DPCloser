@@ -15,6 +15,7 @@ def parse_node_long_name(long_name):
 class Alignment:
 
     VALID_THRESHOLD = 0.95
+    ERROR_MARGIN = 1
 
     def __init__(self, alignment_line):
         self.line = alignment_line
@@ -68,13 +69,19 @@ class Alignment:
         if self.is_forward:
             real_self_end = self.end + self.end_cut
             result_other_start = alignment.start - alignment.start_cut
-            return result_other_start  - min_insert <= \
-                real_self_end - shift <= result_other_start + min_delete
+            valid_l = result_other_start  - min_insert - \
+                Alignment.ERROR_MARGIN
+            valid_h = result_other_start + min_delete + \
+                Alignment.ERROR_MARGIN
+            return valid_l <= real_self_end - shift <= valid_h
         else:
             real_self_end = self.end - self.end_cut
             real_other_start = alignment.start + alignment.start_cut
-            return real_other_start - min_delete <= \
-                real_self_end + shift <= real_other_start + min_insert
+            valid_l = real_other_start - min_delete - \
+                Alignment.ERROR_MARGIN
+            valid_h = real_other_start + min_insert + \
+                Alignment.ERROR_MARGIN
+            return valid_l <= real_self_end + shift <= valid_h
 
     @classmethod
     def index(cls, alignments, key):
