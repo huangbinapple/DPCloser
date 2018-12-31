@@ -134,7 +134,7 @@ def write_file(output_file, alignments):
         fout.write('\n')
     fout.close()
 
-def printHelpMessage():
+def print_help_message():
     body = '[-h] <-l overlap len> <fastg file> <blast result> <output>'
     print('python3 {} {}'.format(__file__, body))
 
@@ -148,10 +148,10 @@ def main():
         if option == '-l':
             overlap_len = int(value)
         elif option == '-h':
-            printHelpMessage()
+            print_help_message()
             sys.exit()
         else:
-            printHelpMessage()
+            print_help_message()
             sys.exit()
     fastg_file_name, blast_result_file, output_file = args
 
