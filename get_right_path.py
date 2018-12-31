@@ -3,6 +3,7 @@ import getopt
 import itertools
 
 import fastg_file
+import dot_file
 from Bio import SeqIO
 
 def parse_node_long_name(long_name):
@@ -43,6 +44,11 @@ class Alignment:
             self.identity > Alignment.VALID_THRESHOLD else False
         self.is_forward = s_end > s_start
         self.children = []
+
+    def __str__(self):
+        return ','.join((self.query_node_id,
+            '-'.join(map(str, (self.start, self.end)))
+            ))
 
     def add_child(self, alignemnt):
         self.children.append(alignemnt)
@@ -108,6 +114,16 @@ class Alignment:
                         alignments[i].add_child(alignments[j])
                     j += 1
 
+    @classmethod
+    def write_alignments_to_dot_file(cls, alignments, file_name):
+        with dot_file.DotFile(file_name) as fout:
+            for alignment in alignments:
+                fout.add_node(str(alignment))
+                if alignment.children:
+                    for child in alignment.children:
+                        fout.add_edge(*map(str, (alignment, child)))
+                
+
 def read_file(file_name):
     alignemnts = []
     with open(file_name) as fin:
@@ -161,7 +177,8 @@ def main():
         read_file(blast_result_file)))
     Alignment.add_connection(alignments, nodes)
     alignments.sort(key=lambda x: x.start)
-    write_file(output_file, alignments)
+    # write_file(output_file, alignments)
+    Alignment.write_alignments_to_dot_file(alignments, output_file)
 
 if __name__ == '__main__':
     main()
