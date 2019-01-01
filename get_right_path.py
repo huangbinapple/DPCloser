@@ -16,6 +16,8 @@ class Alignment:
 
     VALID_THRESHOLD = 0.95
     ERROR_MARGIN = 1
+    COLOR_PROFILE = ['green', 'yellow', 'yellow', 'orange', 'orange',
+        'red']
 
     def __init__(self, alignment_line):
         self.line = alignment_line
@@ -27,7 +29,7 @@ class Alignment:
         )
         identity = float(tokens[2]) / 100
         alignment_length = int(tokens[3])
-        # num_error = int(tokens[4])
+        self.num_mismatch = int(tokens[4])
         self.gap_open = int(tokens[5])
         q_start, q_end, s_start, s_end = map(int, tokens[6:10])
         self.start_cut = q_start - 1
@@ -83,6 +85,12 @@ class Alignment:
                 Alignment.ERROR_MARGIN
             return valid_l <= real_self_end + shift <= valid_h
 
+    @property
+    def fill_color(self):
+        return self.COLOR_PROFILE[
+            min(len(self.COLOR_PROFILE) - 1,
+                self.num_mismatch + self.gap_open)]
+
     @classmethod
     def index(cls, alignments, key):
         if key == 'node id':
@@ -125,7 +133,8 @@ class Alignment:
     def write_alignments_to_dot_file(cls, alignments, file_name):
         with dot_file.DotFile(file_name) as fout:
             for alignment in alignments:
-                fout.add_node(str(alignment))
+                fout.add_node(str(alignment),
+                    {"color": alignment.fill_color})
                 if alignment.children:
                     for child in alignment.children:
                         fout.add_edge(*map(str, (alignment, child)))
