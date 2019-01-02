@@ -47,6 +47,8 @@ class Alignment:
             self.identity > Alignment.VALID_THRESHOLD else False
         self.is_forward = s_end > s_start
         self.children = []
+        self.color = self.COLOR_PROFILE[min(len(self.COLOR_PROFILE) - 1,
+            self.num_mismatch + self.gap_open)]
 
     def __str__(self):
         return ','.join((self.query_node_id,
@@ -54,8 +56,8 @@ class Alignment:
             str(self.end - self.start + 1)
             ))
 
-    def add_child(self, alignemnt):
-        self.children.append(alignemnt)
+    def add_child(self, alignment):
+        self.children.append(alignment)
 
     def adjacent_before(self, alignment, overlap):
         """This mean self is adjacent to `alignment` and 
@@ -86,12 +88,6 @@ class Alignment:
                 Alignment.ERROR_MARGIN
             return valid_l <= real_self_end + shift <= valid_h
 
-    @property
-    def fill_color(self):
-        return self.COLOR_PROFILE[
-            min(len(self.COLOR_PROFILE) - 1,
-                self.num_mismatch + self.gap_open)]
-
     @classmethod
     def index(cls, alignments, key):
         if key == 'node id':
@@ -101,11 +97,11 @@ class Alignment:
         else:
             raise ValueError('Key not supported.')
         index = {}
-        for alignemnt in alignments:
-            if getattr(alignemnt, key_attr) in index:
-                index[getattr(alignemnt, key_attr)].append(alignemnt)
+        for alignment in alignments:
+            if getattr(alignment, key_attr) in index:
+                index[getattr(alignment, key_attr)].append(alignment)
             else:
-                index[getattr(alignemnt, key_attr)] = [alignemnt]
+                index[getattr(alignment, key_attr)] = [alignment]
         return index
 
     @classmethod
@@ -131,24 +127,49 @@ class Alignment:
                     j += 1
 
     @classmethod
-    def write_alignments_to_dot_file(cls, alignments, file_name):
+    def write_alignments_to_dot_file(cls, alignments, file_name,
+            actions=None):
         with dot_file.DotFile(file_name) as fout:
             for alignment in alignments:
                 fout.add_node(str(alignment),
-                    {"color": alignment.fill_color})
+                    {"color": alignment.color})
                 if alignment.children:
                     for child in alignment.children:
-                        fout.add_edge(*map(str, (alignment, child)))
-                
+                        attribute = {}
+                        if actions and actions[alignment] == child:
+                            attribute['color'] = 'green'
+                        fout.add_edge(*map(str, (alignment, child)),
+                            attribute)
+
+    @classmethod
+    def get_path(cls, alignments):
+        values = {a: (1 if a.color == 'green' else 0) \
+            for a in alignments}
+        actions = {a: (a.children[0] if a.children else None) \
+            for a in alignments}
+        for _ in range(len(alignments)):
+            for alignment in alignments:
+                if actions[alignment]:
+                    # Update values of alignments.
+                    values[alignment] = values[actions[alignment]] + \
+                        1 if alignment.color == 'green' else 0
+
+                    children_values = [values[child] for \
+                        child in alignment.children]
+                    # Update action of alignments. 
+                    actions[alignment] = alignment.children[
+                        children_values.index(max(children_values))
+                    ]
+        return values, actions
 
 def read_file(file_name):
-    alignemnts = []
+    alignments = []
     with open(file_name) as fin:
         for line in filter(lambda x: not x.startswith('#'), fin):
             # Parse a line.
-            alignemnt = Alignment(line)
-            alignemnts.append(alignemnt)
-    return alignemnts
+            alignment = Alignment(line)
+            alignments.append(alignment)
+    return alignments
 
 def is_adjacent(node_a, node_b, node_id2alignments, overlap):
     for alignment_a, alignment_b in itertools.product(
@@ -195,7 +216,9 @@ def main():
     Alignment.add_connection(alignments, nodes)
     alignments.sort(key=lambda x: x.start)
     # write_file(output_file, alignments)
-    Alignment.write_alignments_to_dot_file(alignments, output_file)
+    actions = Alignment.get_path(alignments)[1]
+    Alignment.write_alignments_to_dot_file(alignments, output_file,
+        actions)
 
 if __name__ == '__main__':
     main()
