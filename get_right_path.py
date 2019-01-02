@@ -50,7 +50,8 @@ class Alignment:
 
     def __str__(self):
         return ','.join((self.query_node_id,
-            '-'.join(map(str, (self.start, self.end)))
+            '-'.join(map(str, (self.start, self.end))),
+            str(self.end - self.start + 1)
             ))
 
     def add_child(self, alignemnt):
