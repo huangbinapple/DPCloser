@@ -14,7 +14,7 @@ def parse_node_long_name(long_name):
 
 class Alignment:
 
-    VALID_THRESHOLD = 0.95
+    VALID_THRESHOLD = 0.9
     ERROR_MARGIN = 1
     COLOR_PROFILE = ['green', 'yellow', 'yellow', 'orange', 'orange',
         'red']
@@ -145,6 +145,19 @@ class Alignment:
                             attribute)
 
     @classmethod
+    def write_path_to_dot_file(cls, actions, values, file_name):
+        with dot_file.DotFile(file_name) as fout:
+            alignment_values = list(values.items())
+            alignments, values = zip(*alignment_values)
+            max_index = values.index(max(values))
+            alignment = alignments[max_index]
+            next_alignment = actions[alignment]
+            while next_alignment:
+                fout.add_edge(*map(str, (alignment, next_alignment)))
+                alignment = next_alignment
+                next_alignment = actions[alignment]
+    
+    @classmethod
     def get_path(cls, alignments):
         values = {a: (1 if a.color == 'green' else 0) \
             for a in alignments}
@@ -220,8 +233,9 @@ def main():
     alignments.sort(key=lambda x: x.start)
     # write_file(output_file, alignments)
     values, actions = Alignment.get_path(alignments)
-    Alignment.write_alignments_to_dot_file(alignments, output_file,
-        actions, values)
+    # Alignment.write_alignments_to_dot_file(alignments, output_file,
+        # actions, values)
+    Alignment.write_path_to_dot_file(actions, values, output_file)
 
 if __name__ == '__main__':
     main()
