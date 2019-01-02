@@ -128,11 +128,14 @@ class Alignment:
 
     @classmethod
     def write_alignments_to_dot_file(cls, alignments, file_name,
-            actions=None):
+            actions=None, values=None):
         with dot_file.DotFile(file_name) as fout:
             for alignment in alignments:
-                fout.add_node(str(alignment),
-                    {"color": alignment.color})
+                attribute = {"color": alignment.color}
+                if values:
+                    attribute["label"] = str(alignment) + ',' + \
+                        str(values[alignment])
+                fout.add_node(str(alignment), attribute)
                 if alignment.children:
                     for child in alignment.children:
                         attribute = {}
@@ -152,7 +155,7 @@ class Alignment:
                 if actions[alignment]:
                     # Update values of alignments.
                     values[alignment] = values[actions[alignment]] + \
-                        1 if alignment.color == 'green' else 0
+                        (1 if alignment.color == 'green' else 0)
 
                     children_values = [values[child] for \
                         child in alignment.children]
@@ -216,9 +219,9 @@ def main():
     Alignment.add_connection(alignments, nodes)
     alignments.sort(key=lambda x: x.start)
     # write_file(output_file, alignments)
-    actions = Alignment.get_path(alignments)[1]
+    values, actions = Alignment.get_path(alignments)
     Alignment.write_alignments_to_dot_file(alignments, output_file,
-        actions)
+        actions, values)
 
 if __name__ == '__main__':
     main()
