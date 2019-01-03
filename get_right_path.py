@@ -29,6 +29,7 @@ class Alignment:
         )
         identity = float(tokens[2]) / 100
         alignment_length = int(tokens[3])
+        self.alignment_length = alignment_length
         self.num_mismatch = int(tokens[4])
         self.gap_open = int(tokens[5])
         q_start, q_end, s_start, s_end = map(int, tokens[6:10])
@@ -160,16 +161,20 @@ class Alignment:
     
     @classmethod
     def get_path(cls, alignments):
-        values = {a: (1 if a.color == 'green' else 0) \
+        values = {a: (a.alignment_length - a.num_mistake) \
             for a in alignments}
         actions = {a: (a.children[0] if a.children else None) \
             for a in alignments}
         for _ in range(len(alignments)):
             for alignment in alignments:
                 if actions[alignment]:
+                    next_alignemnt = actions[alignment]
                     # Update values of alignments.
-                    values[alignment] = values[actions[alignment]] + \
-                        (1 - alignment.num_mistake)
+                    overlap_size = alignment.end - \
+                        next_alignemnt.start + 1
+                    values[alignment] = values[next_alignemnt] + \
+                        (alignment.alignment_length - \
+                        alignment.num_mistake) - overlap_size
 
                     children_values = [values[child] for \
                         child in alignment.children]
@@ -234,9 +239,9 @@ def main():
     alignments.sort(key=lambda x: x.start)
     # write_file(output_file, alignments)
     values, actions = Alignment.get_path(alignments)
-    # Alignment.write_alignments_to_dot_file(alignments, output_file,
-        # actions, values)
-    Alignment.write_path_to_dot_file(actions, values, output_file)
+    Alignment.write_alignments_to_dot_file(alignments, output_file,
+        actions, values)
+    # Alignment.write_path_to_dot_file(actions, values, output_file)
 
 if __name__ == '__main__':
     main()
