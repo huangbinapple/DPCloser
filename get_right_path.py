@@ -165,16 +165,24 @@ class Alignment:
             for a in alignments}
         actions = {a: (a.children[0] if a.children else None) \
             for a in alignments}
-        for _ in range(len(alignments)):
+        n_count = 0
+        to_update = True
+        alignments.sort(key=lambda a: a.start, reverse=True)
+        while to_update:
+            to_update = False
             for alignment in alignments:
                 if actions[alignment]:
                     next_alignemnt = actions[alignment]
                     # Update values of alignments.
                     overlap_size = alignment.end - \
                         next_alignemnt.start + 1
-                    values[alignment] = values[next_alignemnt] + \
+                    old_value = values[alignment]
+                    new_value = values[next_alignemnt] + \
                         (alignment.alignment_length - \
                         alignment.num_mistake) - overlap_size
+                    if new_value != old_value:
+                        to_update = True
+                        values[alignment] = new_value
 
                     children_values = [values[child] for \
                         child in alignment.children]
@@ -182,6 +190,8 @@ class Alignment:
                     actions[alignment] = alignment.children[
                         children_values.index(max(children_values))
                     ]
+            n_count += 1
+        print(len(alignments), n_count)
         return values, actions
 
 def read_file(file_name):
