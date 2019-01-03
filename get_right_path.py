@@ -47,8 +47,9 @@ class Alignment:
             self.identity > Alignment.VALID_THRESHOLD else False
         self.is_forward = s_end > s_start
         self.children = []
+        self.num_mistake = self.num_mismatch + self.gap_open
         self.color = self.COLOR_PROFILE[min(len(self.COLOR_PROFILE) - 1,
-            self.num_mismatch + self.gap_open)]
+            self.num_mismatch)]
 
     def __str__(self):
         return ','.join((self.query_node_id,
@@ -168,7 +169,7 @@ class Alignment:
                 if actions[alignment]:
                     # Update values of alignments.
                     values[alignment] = values[actions[alignment]] + \
-                        (1 if alignment.color == 'green' else 0)
+                        (1 - alignment.num_mistake)
 
                     children_values = [values[child] for \
                         child in alignment.children]
