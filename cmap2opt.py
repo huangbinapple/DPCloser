@@ -59,7 +59,7 @@ def main():
 
     site_positions = read_cmap_file(cmap_file)
     # Turn positions into intervals.
-    intervals = []
+    intervals = [site_positions[0]]
     for i in range(1, len(site_positions)):
         intervals.append(site_positions[i] - site_positions[i-1])
     # Write file.
