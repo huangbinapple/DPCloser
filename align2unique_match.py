@@ -4,34 +4,12 @@ import getopt
 
 import cmap_file
 import xmap_file
+import bionano_util
 
 
 def print_help():
     body = '<contig_cmap> <contig_key> <ref_cmap> <align_dir> <output_file>'
     print("python3 {} {}".format(__file__, body))
-
-def compare_refs(refs_, refs, align_option=True):
-    transform_arrays = {}
-    for ref_id, cmap_ in refs_.items():
-        if len(cmap_.positions) != len(refs[ref_id].positions):
-            transform_array = []
-            transform_arrays[ref_id] = transform_array
-            index = 0
-            positions = refs[ref_id].positions
-            for position_ in cmap_.positions:
-                if position_ == positions[index]:
-                    transform_array.append(index)
-                else:
-                    if align_option:
-                        transform_array.append(index)
-                    else:
-                        transform_array.append(index + 1)
-                    index += 1
-                index += 1
-            assert len(transform_array) == len(cmap_.positions)
-        else:
-            transform_arrays[ref_id] = list(range(len(cmap_.positions)))
-    return transform_arrays
 
 def retrieve_fragments(fragments, indexs):
     result = []
@@ -80,13 +58,7 @@ def main():
     contig_cmap, contig_key, ref_cmap, align_dir, output_file = args
 
     # read key file.
-    contig_id2node_name = {}
-    with open(contig_key) as f:
-        for i in range(4):
-            f.readline()
-        for line in f:
-            tokens = line.split('\t')
-            contig_id2node_name[tokens[0]] = tokens[1]
+    contig_id2node_name = bionano_util.read_key_file(contig_key)
 
     # read contig_camp file.
     contigs = cmap_file.read_file(contig_cmap)
@@ -106,8 +78,8 @@ def main():
     assert refs_, alignment_file
 
     # Compare refs and refs_.
-    transform_arrays = compare_refs(refs_, refs)
-    transform_arrays_rev = compare_refs(refs_, refs, False)
+    transform_arrays = cmap_file.compare_cmaps(refs_, refs)
+    transform_arrays_rev = cmap_file.compare_cmaps(refs_, refs, False)
 
     with open(output_file, 'w') as fout:
         for id_query, id_ref, oritation, alignment_info in \

@@ -43,6 +43,29 @@ def read_file(file_name):
             result[current_id] = CMap(current_id, positions[:-1], length)
     return result
 
+def compare_cmaps(cmaps_, cmaps, align_option=True):
+    transform_arrays = {}
+    for cmap_id, cmap_ in cmaps_.items():
+        if len(cmap_.positions) != len(cmaps[cmap_id].positions):
+            transform_array = []
+            transform_arrays[cmap_id] = transform_array
+            index = 0
+            positions = cmaps[cmap_id].positions
+            for position_ in cmap_.positions:
+                if position_ == positions[index]:
+                    transform_array.append(index)
+                else:
+                    if align_option:
+                        transform_array.append(index)
+                    else:
+                        transform_array.append(index + 1)
+                    index += 1
+                index += 1
+            assert len(transform_array) == len(cmap_.positions)
+        else:
+            transform_arrays[cmap_id] = list(range(len(cmap_.positions)))
+    return transform_arrays
+
 def _test_read_file():
     input_file = sys.argv[1]
     for k, v in read_file(input_file).items():
