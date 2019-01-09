@@ -18,18 +18,15 @@ def retrieve_fragments(fragments, indexs):
             indexs[0] :\
             indexs[0] + 1
         ])
-        print(indexs[0], indexs[0] + 1)
         for i in range(1, len(indexs)):
             result.append(fragments[
                 indexs[i - 1] + 1 :\
                 indexs[i] + 1
             ])
-            print(indexs[i - 1] + 1, indexs[i] + 1)
         result.append(fragments[
             indexs[i] + 1 : \
             indexs[i] + 2
             ])
-        print(indexs[i] + 1, indexs[i] + 2)
     else:
         result.append(fragments[
             indexs[0] + 1 :
@@ -62,8 +59,6 @@ def main():
 
     # read contig_camp file.
     contigs = cmap_file.read_file(contig_cmap)
-    print(contigs['363'].fragments)
-    print(len(contigs['363'].fragments))
 
     # read ref cmap file.
     refs = cmap_file.read_file(ref_cmap)
