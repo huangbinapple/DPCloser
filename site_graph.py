@@ -85,7 +85,7 @@ def read_file(file_name, nodes):
             except KeyError:
                 end_site = Site(end_site_id)
                 sites[end_site_id] = end_site
-            start_site.addChild(end_site, interval, paths, is_contaminated_infos)
+            start_site.add_child(end_site, interval, paths, is_contaminated_infos)
 
     fin.close()
     print('Load {} sites.'.format(len(sites)))
