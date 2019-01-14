@@ -32,15 +32,15 @@ class Gap:
     @staticmethod
     def read_from_lines(lines):
         for i in range(3):
-            line = lines.pop().rstrip()
+            line = lines[i].rstrip()
             if i == 0:
                 start_node_id, end_node_id = line.split(' ')
             elif i == 1:
                 tokens = line.split('; ')
                 start_site_index, start_site_position = \
-                    map(int, tokens[0].split(', '))
+                    map(lambda x: int(float(x)), tokens[0].split(', '))
                 end_site_index, end_site_position = \
-                    map(int, tokens[1].split(', '))
+                    map(lambda x: int(float(x)), tokens[1].split(', '))
             else:
                 intervals = map(int, line.split(' '))
         gap = Gap(start_node_id, end_node_id, start_site_index,
