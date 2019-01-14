@@ -101,7 +101,7 @@ def _test_read_file():
         print(site.id)
         print([(ele[0], ele[1]) for ele in site.children])
 
-def write_file(file_name, sites, comment_list):
+def write_file(file_name, sites, comment_list=[]):
     fout = open(file_name, 'w')
 
     # Write commons
