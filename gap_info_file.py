@@ -38,11 +38,14 @@ class Gap:
             elif i == 1:
                 tokens = line.split('; ')
                 start_site_index, start_site_position = \
-                    map(lambda x: int(float(x)), tokens[0].split(', '))
+                    tuple(map(lambda x: int(float(x)),
+                        tokens[0].split(', ')))
                 end_site_index, end_site_position = \
-                    map(lambda x: int(float(x)), tokens[1].split(', '))
+                    tuple(map(lambda x: int(float(x)),
+                        tokens[1].split(', ')))
             else:
-                intervals = map(int, line.split(' '))
+                intervals = tuple(map(lambda x: int(float(x)),
+                    line.split(' ')))
         gap = Gap(start_node_id, end_node_id, start_site_index,
             start_site_position, end_site_index, end_site_position,
             intervals)
