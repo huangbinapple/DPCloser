@@ -11,7 +11,7 @@ def print_help():
     body = '-f <fastg_file> -o <overlap size> [-s <site graph file>] <gap_info_file> <gap_path> <gap_seq>'
     print("python3 {} {}".format(__file__, body))
 
-def get_site_id_by_index(index, site_position_index):
+def get_site_by_index(index, site_position_index):
     positions = sorted(list(site_position_index.keys()))
     return site_position_index[positions[index]]
 
@@ -62,9 +62,9 @@ def main():
     for gap in gaps:
         start_node_id = get_node_id_from_long_name(gap.start_node_id)
         end_node_id = get_node_id_from_long_name(gap.end_node_id)
-        start_site = get_site_id_by_index(gap.start_site_index, 
+        start_site = get_site_by_index(gap.start_site_index, 
             site_position_index[nodes[start_node_id]])
-        end_site = get_site_id_by_index(gap.end_site_index, 
+        end_site = get_site_by_index(gap.end_site_index, 
             site_position_index[nodes[end_node_id]])
         print(start_site.id, end_site.id)
 
