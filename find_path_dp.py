@@ -535,7 +535,7 @@ def main():
     intervals = positions_to_intervals(measures)
     result = find_path(start_sites, end_sites, sites, intervals, n_rank)
     node_path, is_valids = process_find_path_result(result, sites, intervals)
-    with open(output_file_name, 'w+') as fout:
+    with open(output_file_name, 'a') as fout:
         fout.write('>{}\n'.format(gap_name))
         fout.write(get_seq(node_path, is_valids, position_in_start_node, position_in_end_node))
 
