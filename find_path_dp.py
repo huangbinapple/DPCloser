@@ -412,6 +412,7 @@ def get_measure_len(action_strs, intervals):
     return result
 
 def get_seq(node_path, is_valids, start_trim_len, end_keep_len):
+    is_valids = [True] * len(is_valids)
     overlap = start_trim_len if start_trim_len else 0
     current_node = node_path[0]
     is_last_node_valid = True
@@ -538,6 +539,7 @@ def main():
     with open(output_file_name, 'a') as fout:
         fout.write('>{}\n'.format(gap_name))
         fout.write(get_seq(node_path, is_valids, position_in_start_node, position_in_end_node))
+        fout.write('\n')
 
 
 if __name__ == '__main__':
