@@ -533,9 +533,8 @@ def main():
 
     start_sites = [sites[ele] for ele in start_site_ids]
     end_sites = [sites[ele] for ele in end_site_ids]
-    intervals = positions_to_intervals(measures)
-    result = find_path(start_sites, end_sites, sites, intervals, n_rank)
-    node_path, is_valids = process_find_path_result(result, sites, intervals)
+    result = find_path(start_sites, end_sites, sites, measures, n_rank)
+    node_path, is_valids = process_find_path_result(result, sites, measures)
     with open(output_file_name, 'a') as fout:
         fout.write('>{}\n'.format(gap_name))
         fout.write(get_seq(node_path, is_valids, position_in_start_node, position_in_end_node))
