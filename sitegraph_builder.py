@@ -78,7 +78,7 @@ def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, s
                 sites_in_order[i].add_child(sites_in_order[i + 1], positions[i + 1] - positions[i], [node_])
     return len(site_positions)
 
-def build_site_graph(nodes, mode=0):
+def build_site_graph(nodes, mode=0, max_interval_len=100000):
     print('len of nodes:', len(nodes))
     sites = {}
     site_position_index = {}
@@ -98,7 +98,7 @@ def build_site_graph(nodes, mode=0):
         max_position = max(site_positions.keys())
         max_position_site = site_positions[max_position]
         interval = 0
-        allowed_repeat_num = 2
+        allowed_repeat_num = 3
         node_path = []
         sub_intervals = []
         sub_interval = node.length - max_position - 1  # Steps to take from `max_position` to end of node.
@@ -112,7 +112,7 @@ def build_site_graph(nodes, mode=0):
                 node_path.append(current_node)
                 sub_intervals.append(sub_interval)
                 for child_node, overlap_len in current_node.children:
-                    if node_path.count(child_node) >= allowed_repeat_num:
+                    if node_path.count(child_node) >= allowed_repeat_num or interval > max_interval_len:
                         continue
                     try:
                         to_continue = False
@@ -185,7 +185,7 @@ def _test_build_site_graph():
 
 
 def printHelpMessage():
-    body = '[-h] <-i fastg file> <-l overlap_len> <-o site_graph file>'
+    body = '[-h] <-i fastg file> <-m max_interval_len> <-l overlap_len> <-o site_graph file>'
     print('python3 {} {}'.format(__file__, body))
 
 
@@ -194,7 +194,8 @@ def main():
     output_file = ''
     overlap_len = None
     to_simplify = False
-    options, args = getopt.getopt(sys.argv[1:], 'i:l:o:hs')
+    max_interval_len = None
+    options, args = getopt.getopt(sys.argv[1:], 'm:i:l:o:hs')
     for option, value in options:
         if option == '-i':
             input_file = value
@@ -202,6 +203,8 @@ def main():
             output_file = value
         elif option == '-l':
             overlap_len = int(value)
+        elif option == '-m':
+            max_interval_len = int(value)
         elif option == '-s':
             to_simplify = True
         elif option == '-h':
