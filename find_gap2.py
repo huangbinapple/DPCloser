@@ -3,6 +3,7 @@ located on spades NODE(contig)"""
 
 import sys
 import getopt
+import bisect
 
 import paths_file
 import gap_info_file
@@ -10,42 +11,55 @@ import fastg_file
 import sitegraph_builder
 
 
-def get_site_position(nodes, node_id_list, site_position_indexs, site_rank, len_overlap):
-    sites_in_order = []
-    for i, node_id in enumerate(node_id_list):
-        node = nodes[node_id]
-        try:
-            site_positions = site_position_indexs[node].items()
-        except KeyError:
-            continue
-        if i != 0:
-            site_positions = filter(lambda x: x[0] >= len_overlap, site_positions)
-        site_positions = sorted(list(site_positions))
-        # print('haha')
-        num_site = len(site_positions)
-        # print('num_site:', num_site)
-        if not site_positions:
-            continue
-        sites_in_order_sub = list(zip(*site_positions))[1]
-        # print(list(sites_in_order_sub))
-        sites_in_order.extend(list(zip([node] * num_site, sites_in_order_sub)))
-    # for i, ele in enumerate(sites_in_order):
-        # print(i, ele)
-    result_node, result_site = sites_in_order[site_rank]
-    # print(result_node, result_site)
-    result_site_index, result_site_position = None, None
-    # print(site_position_indexs[result_node])
-    for i, (site_position, site_) in enumerate(sorted(site_position_indexs[result_node].items())):
-        if site_ == result_site:
-            result_site_index, result_site_position = i, site_position
-            break
-    return result_node.uid, result_site_index, result_site_position
+def get_site_position(nodes, node_paths, site_position_indexs, site_position, len_overlap, debug=0):
+    # print('node_paths:', node_paths)
+    # print('site_position:', site_position)
+    current_node_index = 0
+    current_node = nodes[node_paths[current_node_index]]
+    while site_position > current_node.length:
+        next_node_id = node_paths[current_node_index + 1]
+        # print('next_node_id:', next_node_id)
+        child_index = 0
+        while current_node.children[child_index][0].uid != next_node_id:
+            child_index += 1
+        next_node, overlap = current_node.children[child_index]
+        site_position -= (current_node.length - overlap)
+        current_node = next_node
+        current_node_index += 1
+    site_position -= 1  # Convert 1-index to 0-index.
+    # print(current_node, site_position)
 
+    site_positions = site_position_indexs[current_node]
+    if debug:
+        print('current_node_uid: ', current_node.uid)
+        for k, v in sorted(list(site_positions.items())):
+            print(k, v)
+    try:
+        result_site = site_positions[site_position]
+        site_index = sorted(list(site_positions.keys())).index(site_position)
 
-def transform_position(original_node_id, original_site_index, nodes, paths, site_position_indexs, len_overlap):
+    except KeyError:
+        positions_in_order = sorted(list(site_positions.keys()))
+        upper_index = bisect.bisect(positions_in_order, site_position)
+        lower_index = upper_index - 1
+        # print('positions_in_order:', positions_in_order)
+        # print('site_info:', site_info)
+        # print('site_position:', site_position)
+        # print('site_position_in_contig:', site_position_in_contig)
+        # print('current_node:', current_node)
+        # print('neighbors:', positions_in_order[lower_index:upper_index+1])
+        # assert abs(sum(positions_in_order[lower_index:upper_index+1]) / 2 - site_position) < 1
+        # adjusted_site_position = positions_in_order[lower_index if down_when_confused else upper_index]
+        site_position = positions_in_order[upper_index]
+        result_site = site_positions[site_position]
+        site_index = upper_index
+
+    return current_node.uid, site_index, site_position
+
+def transform_position(original_node_id, original_site_position, nodes, paths, site_position_indexs, len_overlap, debug=0):
     node_id_list = paths[original_node_id]
     result_node_id, result_site_index, result_site_position = get_site_position(
-        nodes, node_id_list, site_position_indexs, original_site_index, len_overlap=OVERLAP)
+        nodes, node_id_list, site_position_indexs, original_site_position, len_overlap=OVERLAP, debug=debug)
     return result_node_id, result_site_index, result_site_position
 
 def print_help():
@@ -79,10 +93,17 @@ def main():
     _, site_position_indexs = sitegraph_builder.build_site_graph(nodes, mode=1)
     # Transform gaps.
     for gap in gaps:
+        debug = 0
+        if gap.start_node_id.startswith('NODE_2_'):
+            debug = 1
+        if debug == 1:
+            print('DEBUG:', gap.start_node_id, gap.start_site_index)
         gap.start_node_id, gap.start_site_index, gap.start_site_position =\
-            transform_position(gap.start_node_id, gap.start_site_index, nodes, paths, site_position_indexs, OVERLAP)
+            transform_position(gap.start_node_id, gap.start_site_position, nodes, paths, site_position_indexs, OVERLAP, debug=debug)
         gap.end_node_id, gap.end_site_index, gap.end_site_position =\
-            transform_position(gap.end_node_id, gap.end_site_index, nodes, paths, site_position_indexs, OVERLAP)
+            transform_position(gap.end_node_id, gap.end_site_position, nodes, paths, site_position_indexs, OVERLAP, debug=debug)
+        if debug == 1:
+            print('DEBUG:', gap.start_node_id, gap.start_site_index)
     # Write gaps.
     cmd = ' '.join(sys.argv)
     gap_info_file.write_file(gaps, output_file_name, comments=[cmd])
