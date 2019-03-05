@@ -62,7 +62,8 @@ def main():
     work_dir = None
     task_name = None
     n_thread = 1
-    interface = 'hf:o:n:x:s:'
+    is_node_id_processed = 0
+    interface = 'hf:o:n:x:s:m:'
     options, args = getopt.getopt(sys.argv[1:], interface)
     for option, value in options:
         if option == '-h':
@@ -78,6 +79,8 @@ def main():
             n_thread = int(value)
         elif option == '-o':
             overlap_len = int(value)
+        elif option == '-m':
+            is_node_id_processed = int(value)
     
     gap_info_file_name = args[0]
     if len(args) == 1:
@@ -130,8 +133,12 @@ def main():
 
     exe_tuples = []
     for gap in gaps:
-        start_node_id = get_node_id_from_long_name(gap.start_node_id)
-        end_node_id = get_node_id_from_long_name(gap.end_node_id)
+        if is_node_id_processed:
+            start_node_id = gap.start_node_id
+            end_node_id = gap.end_node_id
+        else:
+            start_node_id = get_node_id_from_long_name(gap.start_node_id)
+            end_node_id = get_node_id_from_long_name(gap.end_node_id)
         start_site_position, start_site = get_site_by_index(
             gap.start_site_index, 
             site_position_index[nodes[start_node_id]])
