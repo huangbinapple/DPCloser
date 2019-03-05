@@ -148,16 +148,26 @@ class Alignment:
 
     @classmethod
     def write_path_to_dot_file(cls, actions, values, file_name):
+        # matched_node_ids = ['252510', '252526', '252226', '252410r', '252216r', '252312', '253626r', '252316', '252486', '252292', '252290', '252244', '252042r', '252228', '252546', '252466', '251900r', '252386r', '252206r', '252434', '252180', '252148', '252482', '252310r', '252382r', '252424r', '252458r', '252036', '251936r', '252408r', '252538r', '253628r', '252448r', '252300', '252208', '252238', '252252', '252288', '252132', '251622r', '252506', '252268r']
+        matched_node_ids = ['252514', '253626r', '252292', '252510', '252196', '252226', '252216r', '252526', '252486', '252312']
+        special_id = set(matched_node_ids)
         with dot_file.DotFile(file_name) as fout:
             alignment_values = list(values.items())
-            alignments, values = zip(*alignment_values)
-            max_index = values.index(max(values))
+            alignments, values_ = zip(*alignment_values)
+            max_index = values_.index(max(values_))
             alignment = alignments[max_index]
             next_alignment = actions[alignment]
             while next_alignment:
+                attribute = {"color": alignment.color}
+                if alignment.query_node_id in special_id:
+                    attribute["style"] = "filled"
+                    attribute["fillcolor"] = 'red'
+                    special_id.remove(alignment.query_node_id)
+                fout.add_node(str(alignment), attribute)
                 fout.add_edge(*map(str, (alignment, next_alignment)))
                 alignment = next_alignment
                 next_alignment = actions[alignment]
+        print('remain special nodes:', special_id)
     
     @classmethod
     def get_path(cls, alignments):
@@ -249,9 +259,9 @@ def main():
     alignments.sort(key=lambda x: x.start)
     # write_file(output_file, alignments)
     values, actions = Alignment.get_path(alignments)
-    Alignment.write_alignments_to_dot_file(alignments, output_file,
-        actions, values)
-    # Alignment.write_path_to_dot_file(actions, values, output_file)
+    # Alignment.write_alignments_to_dot_file(alignments, output_file,
+        # actions, values)
+    Alignment.write_path_to_dot_file(actions, values, output_file)
 
 if __name__ == '__main__':
     main()
