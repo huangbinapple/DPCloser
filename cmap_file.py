@@ -14,6 +14,13 @@ class CMap:
             fragments.append(length - positions[-1])
         self.fragments = fragments
 
+    def reverse(self, site_len):
+        self.fragments.reverse()
+        self.positions = [self.length - self.positions[i] - site_len + 2
+            for i in reversed(range(len(self.positions)))]  # 2 due to 1-index nature of `positions`.
+        for ele in self.fragments:
+            self.positions.append(self.positions[-1] + ele)
+
     def __str__(self):
         return str((self.id, self.length, self.num_site))
 
@@ -69,7 +76,7 @@ def compare_cmaps(cmaps_, cmaps, align_option=True):
 def _test_read_file():
     input_file = sys.argv[1]
     for k, v in read_file(input_file).items():
-        print(k, v)
+        print(k, v, len(v.positions))
         print(v.positions)
         print(v.fragments)
 

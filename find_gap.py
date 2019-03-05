@@ -5,15 +5,25 @@ import cmap_file
 import gap_info_file
 
 
+LEN_SITE = 7
+
 def print_help():
     # body = '-r <unmodified_reference_cmap> <_r_cmap> <_q_cmap> <xmap_file> <gap info file>'
-    body = '[-k <key transform txt>] <_r_cmap> <_q_cmap> <xmap_file> <gap info file>'
+    body = '[-k <key transform txt>] [-m 0/1] <_r_cmap> <_q_cmap> <xmap_file> <gap info file>'
     print("python3 {} {}".format(__file__, body))
 
+
+def get_reversed_name(original_name):
+    if original_name.endswith("'"):
+        return original_name[:-1]
+    else:
+        return original_name + "'"
+
 def main():
+    mode = 0
     # unmodified_reference_cmap = None
     query_key_txt = None
-    interface = 'hk:'
+    interface = 'hm:k:'
     options, args = getopt.getopt(sys.argv[1:], interface)
     for option, value in options:
         if option == '-h':
@@ -21,6 +31,8 @@ def main():
             sys.exit()
         elif option == '-k':
             query_key_txt = value
+        elif option == '-m':
+            mode = int(value)
     r_cmap, q_cmap, xmap_file_name, output_file = args
 
     if query_key_txt:
@@ -30,9 +42,6 @@ def main():
                 tokens = line.split('\t')
                 query_key_index[tokens[0]] = tokens[1]
     
-    for k, v in query_key_index.items():
-        print(k, v)
-
     alignments = xmap_file.read_file_2(xmap_file_name)
     # Transform subject site indexs.
     query_cmap = cmap_file.read_file(q_cmap)
@@ -41,7 +50,18 @@ def main():
     # transform_arrays = cmap_file.compare_cmaps(second_cmap,
         # unmodified_cmap)
     index_by_subject_id = {}
-    for alignment in filter(lambda x: x['oritation'], alignments):
+    if mode == 0:
+        alignments = filter(lambda x: x['oritation'], alignments)
+    reversed_alignment = set()
+    for alignment in alignments:
+        if mode == 1 and alignment['oritation'] == False:
+            alignment['subject_start_index'], alignment['subject_end_index'] = \
+                alignment['subject_end_index'], alignment['subject_start_index']
+            num_site = len(query_cmap[alignment['id_query']].positions)
+            alignment['query_start_index'], alignment['query_end_index'] = (
+                num_site - alignment[ele] - 1 for ele in ('query_end_index', 'query_start_index'))
+            alignment['oritation'] = True
+            reversed_alignment.add(alignment['id_query'])
         # alignment['subject_start_index'] = transform_arrays[alignment[
             # 'id_ref']][alignment['subject_start_index']]
         # alignment['subject_end_index'] = transform_arrays[alignment[
@@ -50,6 +70,11 @@ def main():
             index_by_subject_id[alignment['id_ref']].append(alignment)
         except KeyError:
             index_by_subject_id[alignment['id_ref']] = [alignment]
+
+    if mode == 1:
+        for cmap in query_cmap.values():
+            if cmap.id in reversed_alignment:
+                cmap.reverse(LEN_SITE)
 
     # Collect gaps.
     fout = open(output_file, 'w')
@@ -73,8 +98,8 @@ def main():
             intervals = []
             for i in range(len(positions) - 1):
                 intervals.append(positions[i + 1] - positions[i])
-            start_node_id = query_key_index[start_node_id]
-            end_node_id = query_key_index[end_node_id]
+            start_node_id = query_key_index[start_node_id] if start_node_id not in reversed_alignment else get_reversed_name(query_key_index[start_node_id])
+            end_node_id = query_key_index[end_node_id] if end_node_id not in reversed_alignment else get_reversed_name(query_key_index[end_node_id])
             new_gap = gap_info_file.Gap(start_node_id, end_node_id, 
                 start_site_index, start_site_position,
                 end_site_index, end_site_position, intervals)

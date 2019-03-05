@@ -31,6 +31,9 @@ def read_file_2(file_name):
         alignment['query_start_index'] = alignment_info[0][1] - 1
         alignment['subject_end_index'] = alignment_info[-1][0] - 1
         alignment['query_end_index'] = alignment_info[-1][1] - 1
+        if not alignment['oritation']:
+            alignment['query_start_index'], alignment['query_end_index'] =\
+                alignment['query_end_index'], alignment['query_start_index'] 
         alignments.append(alignment)
     return alignments
 

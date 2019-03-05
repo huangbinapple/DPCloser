@@ -1,5 +1,6 @@
 import sys
 import getopt
+import time
 
 import fastg_file
 import itertools
@@ -78,6 +79,8 @@ def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, s
                 sites_in_order[i].add_child(sites_in_order[i + 1], positions[i + 1] - positions[i], [node_])
     return len(site_positions)
 
+ALLOWED_REPEAT_NUM = 3
+
 def build_site_graph(nodes, mode=0, max_interval_len=100000):
     print('len of nodes:', len(nodes))
     sites = {}
@@ -97,8 +100,8 @@ def build_site_graph(nodes, mode=0, max_interval_len=100000):
     for node, site_positions in site_position_index.items():
         max_position = max(site_positions.keys())
         max_position_site = site_positions[max_position]
+        print('Add child to: {}'.format(max_position_site))
         interval = 0
-        allowed_repeat_num = 3
         node_path = []
         sub_intervals = []
         sub_interval = node.length - max_position - 1  # Steps to take from `max_position` to end of node.
@@ -112,7 +115,7 @@ def build_site_graph(nodes, mode=0, max_interval_len=100000):
                 node_path.append(current_node)
                 sub_intervals.append(sub_interval)
                 for child_node, overlap_len in current_node.children:
-                    if node_path.count(child_node) >= allowed_repeat_num or interval > max_interval_len:
+                    if node_path.count(child_node) >= ALLOWED_REPEAT_NUM or interval > max_interval_len:
                         continue
                     try:
                         to_continue = False
@@ -124,7 +127,7 @@ def build_site_graph(nodes, mode=0, max_interval_len=100000):
                             if child_site_position > min_child_site_position:
                                 max_position_site.add_child(child_site, interval + child_site_position - overlap_len + 1,
                                         node_path + [child_node])
-                                print('Add a child to {}'.format(max_position_site.id), '*' * (len(node_path) + 1))
+                                # print('Add a child to {}'.format(max_position_site.id), '*' * (len(node_path) + 1))
                                 to_continue = True
                                 break
                         if to_continue:
@@ -185,7 +188,7 @@ def _test_build_site_graph():
 
 
 def printHelpMessage():
-    body = '[-h] <-i fastg file> <-m max_interval_len> <-l overlap_len> <-o site_graph file>'
+    body = '[-h] [-s]  <-i fastg file> <-m max_interval_len> <-l overlap_len> <-o site_graph file>'
     print('python3 {} {}'.format(__file__, body))
 
 
@@ -215,17 +218,24 @@ def main():
             sys.exit()
 
     nodes = fastg_file.build_assembly_graph(input_file, overlap=overlap_len)
+    tick = time.time()
     sites, site_position_index = build_site_graph(nodes)
+    tock = time.time()
     if to_simplify:
         print('Simplifying site graph...')
         sites = site_graph.simplify_site_graph(sites)
     print('{} sites created on {} nodes'.format(len(sites), len(site_position_index)))
+    tock2 = time.time()
 
     site_graph.write_file(output_file, sites,
             [' '.join(sys.argv),
              'Number of sites: {}'.format(len(sites)),
              'Number of nodes: {}'.format(len(nodes)),
-             'Numner of nodes contain site: {}'.format(len(site_position_index))]
+             'Numner of nodes contain site: {}'.format(len(site_position_index)),
+             'Max interval len: {}'.format(max_interval_len),
+             'Allowed repeat num: {}'.format(ALLOWED_REPEAT_NUM),
+             'Time used to build graph: {} seconds'.format(round(tock - tick)),
+             'Time used to simplify graph: {} seconds'.format(round(tock2 - tock))]
             )
 
 if __name__ == '__main__':
