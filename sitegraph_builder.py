@@ -29,8 +29,8 @@ def test_find_all():
     string_ic = "CCCGGTGTGTGCAATATACGAAAAAAAAGCCCGTACTTTCGTACGAGCTCTTCTTTAAATATGGCGGTGAGGGGGGGATTGACTCGCTTCGCTCGCCCTGCGGGCAGCCCGCTCACTGCGTTCACGGTCTGTCCAACTGGCTGTCGCCAGTTGTCGAACCCCGGTCGGGGCTTCTCATCCCCCCGGTGTGTGCAATATACGAAAAAAAAGCCCGTACTTTCGTACGAGCTCTTCTTTAAATATGGCGGTGAGGGGGGGATT"
     print(find_all(string_ic, BIONANO_SITE))
 
-def infer_site_position_in_reverse_complement(position, seq_length, key_word_length):
-    return seq_length - key_word_length - position
+def infer_site_position_in_reverse_complement(position, seq_length, key_word_length, shift=0):
+    return seq_length - key_word_length - position - shift
 
 def infer_site_position_in_child(position, parent_length, overlap_length):
     return position - (parent_length - overlap_length)
@@ -48,7 +48,7 @@ def get_site_ic(site, sites):
     result_site_id = site.id[:-1] if site.id.endswith('r') else site.id + 'r'
     return sites[result_site_id]
 
-def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, sites):
+def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, sites, shift=0):
     node_ic = get_node_ic(node, nodes)
 
     # Find positions, if there is none, return.
@@ -62,7 +62,7 @@ def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, s
             new_site_id = str(min_id_avalable)
             new_site = Site(new_site_id)
             new_site_ic = Site(new_site_id + 'r')
-            site_position_ic = infer_site_position_in_reverse_complement(site_position, node.length, len(BIONANO_SITE[0]))
+            site_position_ic = infer_site_position_in_reverse_complement(site_position, node.length, len(BIONANO_SITE[0]), shift)
             
             # Register new site(_ic) in `position_index`(_ic) & `sites`.
             position_index[site_position] = new_site
@@ -79,41 +79,55 @@ def add_sites_to_node_pair(node, site_position_indexs, min_id_avalable, nodes, s
                 sites_in_order[i].add_child(sites_in_order[i + 1], positions[i + 1] - positions[i], [node_])
     return len(site_positions)
 
-ALLOWED_REPEAT_NUM = 3
+ALLOWED_REPEAT_NUM = 2
 
-def build_site_graph(nodes, mode=0, max_interval_len=100000):
+def build_site_graph(nodes, shift=0, mode=0, max_interval_len=100000):
     print('len of nodes:', len(nodes))
     sites = {}
     site_position_index = {}
     node_id = 0
     for node in filter(lambda x: x.uid[-1] != 'r', sorted(nodes.values(), key=lambda x: x.uid)):
         node_ic = get_node_ic(node, nodes)
-        num_sites_added = add_sites_to_node_pair(node, site_position_index, node_id, nodes, sites)
+        num_sites_added = add_sites_to_node_pair(node, site_position_index, node_id, nodes, sites, shift)
         node_id += num_sites_added
-        if num_sites_added:
-            print('add {} site(s) in node {}, {}'.format(num_sites_added, node.uid, node_ic.uid))
+        # if num_sites_added:
+            # print('add {} site(s) in node {}, {}'.format(num_sites_added, node.uid, node_ic.uid))
 
     if mode == 1:
         # only return index:
         return None, site_position_index
     # Add site graph edges that jump between nodes.
+    print('Number of sites: {}'.format(len(sites)))
+    print('Number of nodes: {}'.format(len(nodes)))
+    print('Numner of nodes contain site: {}'.format(len(site_position_index)),)
+    print('Great percentage:', round(len(site_position_index) / len(nodes) * 100, 2))
     for node, site_positions in site_position_index.items():
+        # if node.uid != '252560r':
+            # continue
         max_position = max(site_positions.keys())
         max_position_site = site_positions[max_position]
         print('Add child to: {}'.format(max_position_site))
         interval = 0
         node_path = []
         sub_intervals = []
+        # print('node.length:', node.length)
+        # print('max_position:', max_position)
         sub_interval = node.length - max_position - 1  # Steps to take from `max_position` to end of node.
         frontier = [(node, sub_interval)]
+        # debug = False
         while frontier:
             ele = frontier.pop()
             if type(ele) == tuple:
                 frontier.append(None)
                 current_node, sub_interval = ele
+                # print('sub_interval:', sub_interval)
                 interval += sub_interval
                 node_path.append(current_node)
                 sub_intervals.append(sub_interval)
+                # if current_node.uid == '252560r':
+                    # debug = True
+                    # print('haha')
+
                 for child_node, overlap_len in current_node.children:
                     if node_path.count(child_node) >= ALLOWED_REPEAT_NUM or interval > max_interval_len:
                         continue
@@ -125,6 +139,12 @@ def build_site_graph(nodes, mode=0, max_interval_len=100000):
                         min_child_site_position = overlap_len - len(BIONANO_SITE[0])  # Child_site's position should > this number.
                         for child_site_position, child_site in child_site_positions:
                             if child_site_position > min_child_site_position:
+                                # if debug:
+                                    # print(max_position_site.id, child_site.id, [ele.uid for ele in node_path] + [child_node.uid])
+                                # print('interval:', interval)
+                                # print('overlap_len:', overlap_len)
+                                # print('last_site_positoin:', child_site_position)
+                                # print('last sub_interval:', interval + child_site_position - overlap_len + 1)
                                 max_position_site.add_child(child_site, interval + child_site_position - overlap_len + 1,
                                         node_path + [child_node])
                                 # print('Add a child to {}'.format(max_position_site.id), '*' * (len(node_path) + 1))
@@ -137,8 +157,12 @@ def build_site_graph(nodes, mode=0, max_interval_len=100000):
                         frontier.append((child_node, child_node.length - overlap_len))
             elif ele is None:
                 last_node, sub_interval_ = node_path.pop(), sub_intervals.pop()
+                # if last_node.uid == '253562':
+                    # debug = False
+                    # print('Oh')
                 interval -= sub_interval_
             
+
     return sites, site_position_index
 
 def _test_build_site_graph():
@@ -174,17 +198,11 @@ def _test_build_site_graph():
         node_ids = [[ele.uid for ele in node_path] for node_path in node_paths]
         child_site_id_intervals = list(zip(child_site_ids, intervals))
         child_site_id_intervals_ = sorted(child_site_id_intervals)
-        print(site, positions, 'C:', child_site_id_intervals_)
+        # print(site, positions, 'C:', child_site_id_intervals_)
         if site.id in child_site_ids:
             num_site_contain_self_as_child += 1
             print('!!!')
         count[len(positions)] += 1
-
-    print('count:', count)
-    print('len of sites:', len(sites))
-    print('len of site position index:', len(site_position_index))
-    print('number of position:', num_position_in_index)
-    print('number of self loop:', num_site_contain_self_as_child)
 
 
 def printHelpMessage():
@@ -196,9 +214,10 @@ def main():
     input_file = ''
     output_file = ''
     overlap_len = None
+    shift_len = 0
     to_simplify = False
     max_interval_len = None
-    options, args = getopt.getopt(sys.argv[1:], 'm:i:l:o:hs')
+    options, args = getopt.getopt(sys.argv[1:], 'm:k:i:l:o:hs')
     for option, value in options:
         if option == '-i':
             input_file = value
@@ -206,6 +225,8 @@ def main():
             output_file = value
         elif option == '-l':
             overlap_len = int(value)
+        elif option == '-k':
+            shift = int(value)
         elif option == '-m':
             max_interval_len = int(value)
         elif option == '-s':
@@ -216,16 +237,22 @@ def main():
         else:
             printHelpMessage()
             sys.exit()
-
+    print('overlap_len:', overlap_len)
     nodes = fastg_file.build_assembly_graph(input_file, overlap=overlap_len)
     tick = time.time()
-    sites, site_position_index = build_site_graph(nodes)
+    sites, site_position_index = build_site_graph(nodes, shift=shift)
     tock = time.time()
+
     if to_simplify:
         print('Simplifying site graph...')
         sites = site_graph.simplify_site_graph(sites)
-    print('{} sites created on {} nodes'.format(len(sites), len(site_position_index)))
+    # print('{} sites created on {} nodes'.format(len(sites), len(site_position_index)))
     tock2 = time.time()
+
+    # debug_site = sites['648r']
+    # print('site', debug_site.id, 'has {} children.'.format(len(debug_site.children)))
+    # for child, interval, nodes_path, _ in debug_site.children:
+        # print(child.id, interval, [ele.uid for ele in nodes_path])
 
     site_graph.write_file(output_file, sites,
             [' '.join(sys.argv),
