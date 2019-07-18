@@ -76,12 +76,13 @@ DECAY = sqrt(SIGMA / 2)
 """
 MU = 0
 # MU = 293  # alter
-SIGMA = 200
+SIGMA = 500
+# SIGMA = 100
 FIVE_SIGMA = 5 * SIGMA
 # SIGMA = 846  # alter
 DECAY_INVERSE = math.sqrt(2) / SIGMA
 print('MU:', MU)
-print('SIGMA:', SIGMA)
+# print('SIGMA:', SIGMA)
 print('FIVE_SIGMA:', FIVE_SIGMA)
 def similar_factor(length_reference, length_bionano):
     """
@@ -92,7 +93,7 @@ def similar_factor(length_reference, length_bionano):
         (numpy.array, size: n x 1, dtype: float64): score factor represent the similarity between measured and reference length.
     """
     error = np.abs(length_bionano - (MU + length_reference))
-    error = np.minimum(error, FIVE_SIGMA)
+    # error = np.minimum(error, FIVE_SIGMA)
     result = np.exp(- error * DECAY_INVERSE)
     return result
 
@@ -105,7 +106,8 @@ def _test_similar_factor():
         result.append(score)
     # print('ratio:', result[0] / result[1])
 
-MERGE_LEN = 4000
+# MERGE_LEN = 4000
+MERGE_LEN = 0
 FN_RATE = .228
 print('MERGE_LEN:', MERGE_LEN)
 print('FN_RATE:', FN_RATE)
@@ -174,7 +176,7 @@ def update_fingerprint(original_fingerprint, child_index):
 
 CRITICAL_FN_FACTOR = FN_RATE ** (MAX_CONTINUE_FN)
 print('CRITICAL_FN_FACTOR:', CRITICAL_FN_FACTOR)
-def propagate(i, start_site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, min_prob):
+def propagate(i, start_site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, min_prob=0):
     """
     Alter tables of sites who's in the downstream of `start_site`.
     Arguments:
@@ -298,7 +300,7 @@ def trace_back(prob_matrixs, tracker_matrixs, mol_index, tracker):
     node_path, contamination = zip(*node_path)
     return site_path, node_path, contamination, probs, lengths, actions, child_indexs
 
-def find_path(start_sites, end_sites, sites, intervals, n_rank):
+def find_path(start_sites, end_sites, sites, intervals, n_rank, pruning_index=0):
     """
     Find `n_rank` paths in site graph that the interval of sites on path best match `intervals`.
     Argument:
@@ -336,7 +338,8 @@ def find_path(start_sites, end_sites, sites, intervals, n_rank):
         new_reached_sites = set()
         print("len_reached_sites:", len(reached_sites))
         for site in reached_sites:
-            new_reached_sites.update(propagate(i, site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, 1 / len(sites) * 1e-5))
+            new_reached_sites.update(propagate(i, site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, 1 / len(sites) * pruning_index))
+            # new_reached_sites.update(propagate(i, site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, 1 / len(sites)))
             # new_reached_sites.update(propagate(i, site, intervals, prob_matrixs, tracker_matrixs, fingerprint_matrixs, 0))
         # print('new reached sites')
         # print([ele.id for ele in new_reached_sites])
@@ -350,26 +353,29 @@ def find_path(start_sites, end_sites, sites, intervals, n_rank):
         total_sum_invert = 1 / total_sum
         for ele in prob_matrixs.values():
             ele[i] *= total_sum_invert
+        print('probabilities:')
+        print(sorted(list((ele[i][0] for ele in prob_matrixs.values())), reverse=True))
 
-    # f_prob = open('prob_matrixs_0', 'wb')
+#     f_prob = open('prob_matrixs_0', 'wb')
     # f_tracker = open('tracker_matrixs_0', 'wb')
-    
+    # 
     # prob_matrixs_pickle, tracker_matrixs_pickle = {}, {}
     # for key, value in prob_matrixs.items():
-    #     prob_matrixs_pickle[key.id] = value
+        # prob_matrixs_pickle[key.id] = value
     # for key, value in tracker_matrixs.items():
-    #     new_matrix = np.empty_like(value)
-    #     for i in range(value.shape[0] * value.shape[1]):
-    #         old_content = value.flat[i]
-    #         new_content = (old_content[0].id, old_content[1], old_content[2]) if old_content else None
-    #         new_matrix.flat[i] = new_content
-    #     tracker_matrixs_pickle[key.id] = new_matrix
+        # new_matrix = np.empty_like(value)
+        # for i in range(value.shape[0] * value.shape[1]):
+            # old_content = value.flat[i]
+            # new_content = (old_content[0].id, old_content[1], old_content[2]) if old_content else None
+            # new_matrix.flat[i] = new_content
+        # tracker_matrixs_pickle[key.id] = new_matrix
     # pickle.dump(prob_matrixs_pickle, f_prob, -1)
     # pickle.dump(tracker_matrixs_pickle, f_tracker, -1)
- 
+ # 
     # f_prob.close()
     # f_tracker.close()
-
+# 
+# 
     site_path_probs, final_trackers, final_fingerprints = np.zeros(n_rank), np.empty(n_rank, dtype='object'), np.empty(n_rank, dtype='uint64')
     for end_site in end_sites:
         modify(site_path_probs, final_trackers, final_fingerprints,
@@ -472,7 +478,7 @@ def process_find_path_result(result, sites, intervals):
     print('accu_prob:', accu_prob)
     is_valids = merge_node_path(node_paths)
     for node, is_valid in zip(node_paths[0][0], is_valids):
-        print(node, is_valid)
+        print(is_valid, node)
     return node_paths[0][0], is_valids
 
 
@@ -502,9 +508,10 @@ def print_help():
 
 def main():
     n_rank = 10
-    options, args = getopt.getopt(sys.argv[1:], 'c:s:e:a:b:i:g:o:r:n:')
+    options, args = getopt.getopt(sys.argv[1:], 'c:s:e:a:b:i:g:o:r:n:p:')
     start_site_ids, end_site_ids = [], []
     position_in_start_node, position_in_end_node = None, None
+    pruning_index = 1e-5
     gap_name = None
     for option, value in options:
         if option == '-c':
@@ -521,6 +528,8 @@ def main():
             position_in_end_node = int(float(value))
         elif option == '-i':
             measures = list(map(float, value.split(',')))
+        elif option == '-p':
+            pruning_index = float(value)
         elif option == '-g':
             graph_file = value
             with open(graph_file, 'rb') as fin:
@@ -533,7 +542,7 @@ def main():
 
     start_sites = [sites[ele] for ele in start_site_ids]
     end_sites = [sites[ele] for ele in end_site_ids]
-    result = find_path(start_sites, end_sites, sites, measures, n_rank)
+    result = find_path(start_sites, end_sites, sites, measures, n_rank, pruning_index)
     node_path, is_valids = process_find_path_result(result, sites, measures)
     with open(output_file_name, 'a') as fout:
         fout.write('>{}\n'.format(gap_name))
