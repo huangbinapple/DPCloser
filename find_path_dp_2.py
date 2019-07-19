@@ -57,15 +57,21 @@ def main():
         # nodes = pickle.load(fin)
         # sites = pickle.load(fin)
 
-    logging.basicConfig(filename=args.gap_name + '.log', filemode='w',
-        level=getattr(logging, args.log_level))
+    logger = logging.getLogger('path_finder')
+    logger.setLevel(getattr(logging, args.log_level))
+    file_stream = logging.FileHandler(args.gap_name + '.log', mode='w')
+    file_stream.setLevel(getattr(logging, args.log_level))
+    file_stream.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+    logger.addHandler(file_stream)
     
-    logging.info('Input command: %s', ' '.join(sys.argv))
-    logging.info('Gap name: %s', args.gap_name)
-    logging.info('SIGMA: %d', SIGMA)
-    logging.info('Start site ids: %s', args.start_sites)
-    logging.info('End site ids: %s', args.end_sites)
-    logging.info('Measurements: %s', args.intervals)
+    logger.info('Input command: %s', ' '.join(sys.argv))
+    logger.info('Gap name: %s', args.gap_name)
+    logger.info('SIGMA: %d', SIGMA)
+    logger.info('Start site ids (%d ids): %s', len(args.start_sites), args.start_sites)
+    logger.info('End site ids (%d ids): %s', len(args.end_sites), args.end_sites)
+    logger.info('Measurements (%d intervals): %s', len(args.intervals), args.intervals)
     
 
 if __name__ == "__main__":
