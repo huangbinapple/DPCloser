@@ -11,10 +11,17 @@ import pickle
 # Default parameter.
 MU = 0
 SIGMA = 300
+RANK = 10
+
+HASH_A = 4343534
+HASH_B = 232423
+def update_fingerprint(original_fingerprint, child_index):
+    return (original_fingerprint + HASH_A) * (child_index + HASH_B)
 
 def main():
     global MU
     global SIGMA
+    global RANK
 
     parser = argparse.ArgumentParser()
 
@@ -41,6 +48,10 @@ def main():
         default=SIGMA, type=int,
         metavar='SIGMA', help='Variance of shift in measurement relative to ref.')
 
+    parser.add_argument('--rank',
+        default=RANK, type=int,
+        metavar='RANK', help='Variance of shift in measurement relative to ref.')
+
     parser.add_argument('gap_name',
         metavar='GAP_NAME', help='The gaps name, give a name whatever you want.')
 
@@ -52,6 +63,7 @@ def main():
 
     MU = args.mu
     SIGMA = args.sigma
+    RANK = args.rank
 
     # with open(args.graph_file, 'rb') as fin:
         # nodes = pickle.load(fin)
@@ -69,6 +81,7 @@ def main():
     logger.info('Input command: %s', ' '.join(sys.argv))
     logger.info('Gap name: %s', args.gap_name)
     logger.info('SIGMA: %d', SIGMA)
+    logger.info('RANK: %d', RANK)
     logger.info('Start site ids (%d ids): %s', len(args.start_sites), args.start_sites)
     logger.info('End site ids (%d ids): %s', len(args.end_sites), args.end_sites)
     logger.info('Measurements (%d intervals): %s', len(args.intervals), args.intervals)
