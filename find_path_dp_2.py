@@ -7,14 +7,17 @@ import logging
 import argparse
 import sys
 import pickle
+from numba import njit
 
 # Default parameter.
 MU = 0
 SIGMA = 300
 RANK = 10
 
+
 HASH_A = 4343534
 HASH_B = 232423
+@njit
 def update_fingerprint(original_fingerprint, child_index):
     return (original_fingerprint + HASH_A) * (child_index + HASH_B)
 
