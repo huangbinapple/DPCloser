@@ -17,6 +17,11 @@ logger = None
 MU = 0
 SIGMA = 300
 RANK = 10
+MERGE_LEN = 500
+FN_RATE = .228
+MAX_CONTINUE_FN = 1.9
+
+CRITICAL_FN_FACTOR = FN_RATE ** (MAX_CONTINUE_FN)
 
 HASH_A = 4343534
 HASH_B = 232423
@@ -42,14 +47,17 @@ class PathFinder:
         self._p_tensor = None
         self._t_tensor = None
         self._f_tensor = None
+        self._sites = None
         self._start_sites = set()
         self._end_sites = set()
         self._site_id_to_index = {}
+        self._site_id_to_reachable_children = {}
         self._log_sum = 0
 
     def load_graph_and_interval(self, sites, intervals):
         logger.info("Loading site graph and intervals ...")
         shape = (len(sites), len(intervals) + 1, self._n_rank)
+        self._sites = sites
         self._p_tensor = np.zeros(shape, dtype='float32')
         self._t_tensor = np.empty(shape, dtype='object')
         self._f_tensor = np.zeros(shape, dtype='uint64')
@@ -65,6 +73,32 @@ class PathFinder:
 
     def site_f_tensor(self, site_id):
         return self._f_tensor(self._site_id_to_index[site_id])
+
+    @staticmethod
+    @njit
+    def prob_skip(interval):
+        if interval < MERGE_LEN:
+            return (1 - FN_RATE) * (interval / MERGE_LEN - 1) ** 2 + FN_RATE
+        else:
+            return FN_RATE
+
+    @staticmethod
+    def prob_skip_inverse(prob):
+        assert prob > FN_RATE
+        max_length = MERGE_LEN * (1 - math.sqrt((prob - FN_RATE) / (1 - FN_RATE)))
+        return max_length
+
+    @staticmethod
+    def _test_prob_skip():
+        print('MERGE_LEN:', MERGE_LEN)
+        interval = 100
+        prob = PathFinder.prob_skip(interval)
+        interval_ = PathFinder.prob_skip_inverse(prob)
+        print(interval, interval_)
+
+    def index_reachable_children(self):
+        pass
+             
 
     @staticmethod
     @njit
@@ -178,4 +212,5 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    print(dir(PathFinder))
+    PathFinder._test_prob_skip()
