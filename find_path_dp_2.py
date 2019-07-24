@@ -6,6 +6,7 @@ and clearer output.
 import logging
 import argparse
 import sys
+import math
 import pickle
 import numpy as np
 from numba import njit
@@ -71,7 +72,7 @@ class PathFinder:
         sum_ = tensor[:, index, 0].sum()
         sum_inverse = 1 / sum_
         tensor[:, index, :] *= sum_inverse
-        return np.log2(sum_)
+        return math.log2(sum_)
     
     def normalize(self, index):
         self._log_sum += self._normalize(index, self._p_tensor)
