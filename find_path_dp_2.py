@@ -44,6 +44,7 @@ class PathFinder:
         self._start_sites = set()
         self._end_sites = set()
         self._site_id_to_index = {}
+        self._log_sum = 0
 
     def load_graph_and_interval(self, sites, intervals):
         logger.info("Loading site graph and intervals ...")
@@ -63,6 +64,17 @@ class PathFinder:
 
     def site_f_tensor(self, site_id):
         return self._f_tensor(self._site_id_to_index[site_id])
+
+    @staticmethod
+    @njit
+    def _normalize(index, tensor):
+        sum_ = tensor[:, index, 0].sum()
+        sum_inverse = 1 / sum_
+        tensor[:, index, :] *= sum_inverse
+        return np.log2(sum_)
+    
+    def normalize(self, index):
+        self._log_sum += self._normalize(index, self._p_tensor)
 
     def loading_start_end_sites(self, start_sites=[], end_sites=[]):
         assert not self._start_sites and not self._end_sites
