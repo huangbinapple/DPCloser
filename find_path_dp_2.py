@@ -56,16 +56,22 @@ class PathFinder:
         self._child_index = {}
         self._propagation_index = {}
 
-    def load_graph_and_interval(self, sites, intervals):
-        logger.info("Loading site graph and intervals ...")
-        shape = (len(sites), len(intervals) + 1, self._n_rank)
+    def load_graph(self, sites):
+        logger.info("Loading site graph ...")
         self._sites = sites
+        logger.info("Loaded %d sites.", len(sites))
+        site_ids = sorted(list(sites.keys()))
+        self._site_id_to_index = {k: v for v, k in enumerate(site_ids)}
+        self.index_graph()
+
+    def load_intervals(self, intervals):
+        assert self._sites
+        logger.info("Loading site intervals ...")
+        shape = (len(self._sites), len(intervals) + 1, self._n_rank)
         self._p_tensor = np.zeros(shape, dtype='float32')
         self._t_tensor = np.empty(shape, dtype='object')
         self._f_tensor = np.zeros(shape, dtype='uint64')
-        logger.info("Loaded %d sites, %d intervals.", len(sites), len(intervals))
-        site_ids = sorted(list(sites.keys()))
-        self._site_id_to_index = {k: v for v, k in enumerate(site_ids)}
+        logger.info("Loaded %d intervals.", len(intervals))
 
     def site_p_tensor(self, site_id):
         return self._p_tensor(self._site_id_to_index[site_id])
@@ -99,7 +105,7 @@ class PathFinder:
             )
 
     def _index_propagation_route(self, site):
-        logger.info('Building propagation route for site %s.', site.id)
+        logger.debug('Building propagation route for site %s.', site.id)
         sub_result = []
         n_iter = 0
         # Init loop variables.
@@ -108,7 +114,7 @@ class PathFinder:
         for i in range(len(children_indexs)):
             children_indexs[i] = [i]
         proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
-        logger.info('Init. %d edges.', len(sites))
+        logger.debug('Init. %d edges.', len(sites))
         while True:
             to_proceeds = np.array([proceed_lower_bounds[i] < self._child_index[sites[i]][2]
                 for i in range(len(sites))])  # True means be able to propagate.
@@ -118,11 +124,11 @@ class PathFinder:
             fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
             sub_result.append((sites, children_indexs, intervals, fn_scores))
             new_size = num_to_proceeds.sum()
-            logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
+            logger.debug('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
             if new_size == 0:
                 break
             ## Propagate.
-            logger.info('Propagating from %d edges(%d edges when finished.)...',
+            logger.debug('Propagating from %d edges(%d edges when finished.)...',
                 np.count_nonzero(index_propagate), num_to_proceeds.sum())
             # Construct loop variable for next loop.
             new_sites = np.empty(new_size, dtype=object)
@@ -175,6 +181,7 @@ class PathFinder:
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
     
     def index_graph(self):
+        logger.info('Indexing graph ...')
         logger.info('Build child index for all sites...')
         for site in self._sites.values():
             self._index_children(site)
@@ -186,7 +193,7 @@ class PathFinder:
         logger.info('All site propagation index built.')
 
         count = sum((len(ele[0]) for ele in self._propagation_index.values()))
-        logger.info('%d site, %d edges.', len(self._propagation_index), count)
+        logger.info('Graph index built, %d site, %d edges.', len(self._propagation_index), count)
 
 
 def main():
@@ -264,10 +271,10 @@ def main():
     # args.graph_file.close()  # Needed?
 
     finder = PathFinder(args.rank)
-    finder.load_graph_and_interval(sites, args.intervals)
+    finder.load_graph(sites)
+    finder.load_intervals(args.intervals)
     finder.loading_start_end_sites(args.start_sites, args.end_sites)
-    finder.index_graph()
-    
+
 
 if __name__ == "__main__":
     main()
