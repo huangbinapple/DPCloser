@@ -57,7 +57,7 @@ class PathFinder:
         self._propagation_index = {}
 
     def load_graph(self, sites):
-        logger.info("Loading site graph ...")
+        logger.info("Loading site graph...")
         self._sites = sites
         logger.info("Loaded %d sites.", len(sites))
         site_ids = sorted(list(sites.keys()))
@@ -66,7 +66,7 @@ class PathFinder:
 
     def load_intervals(self, intervals):
         assert self._sites
-        logger.info("Loading site intervals ...")
+        logger.info("Loading site intervals...")
         shape = (len(self._sites), len(intervals) + 1, self._n_rank)
         self._p_tensor = np.zeros(shape, dtype='float32')
         self._t_tensor = np.empty(shape, dtype='object')
@@ -181,7 +181,7 @@ class PathFinder:
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
     
     def index_graph(self):
-        logger.info('Indexing graph ...')
+        logger.info('Indexing graph...')
         logger.info('Build child index for all sites...')
         for site in self._sites.values():
             self._index_children(site)
@@ -263,7 +263,7 @@ def main():
     logger.info('End site ids (%d ids): %s', len(args.end_sites), args.end_sites)
     logger.info('Measurements (%d intervals): %s', len(args.intervals), args.intervals)
 
-    logger.info('Reading graph files ...')
+    logger.info('Reading graph files...')
     nodes = pickle.load(args.graph_file)
     sites = pickle.load(args.graph_file)
     logger.info('Loaded an assembly graph, containing %d nodes.', len(nodes))
