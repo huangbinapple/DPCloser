@@ -84,20 +84,6 @@ class PathFinder:
         else:
             return FN_RATE
 
-    @staticmethod
-    def prob_skip_inverse(prob):
-        assert prob > FN_RATE
-        max_length = MERGE_LEN * (1 - math.sqrt((prob - FN_RATE) / (1 - FN_RATE)))
-        return max_length
-
-    @staticmethod
-    def _test_prob_skip():
-        print('MERGE_LEN:', MERGE_LEN)
-        interval = 100
-        prob = PathFinder.prob_skip(interval)
-        interval_ = PathFinder.prob_skip_inverse(prob)
-        print(interval, interval_)
-
     def _index_children(self, site):
         if site.children:
             children_zip = zip(*site.children)
