@@ -123,52 +123,35 @@ class PathFinder:
             proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
             logger.info('Init. %d edges.', len(sites))
             while True:
-                # Divide loop variables into two parts.
                 to_proceeds = np.array([proceed_lower_bounds[i] < index1[sites[i]][2]
                     for i in range(len(sites))])  # True means be able to propagate.
                 num_to_proceeds = np.array([np.count_nonzero(ele) for ele in to_proceeds])
-                index_finished = (num_to_proceeds == 0)
-                ## Part 1.
-                # sites_finished = sites[index_finished]
-                # children_indexed_finished = children_indexs[index_finished]
-                # intervals_finished = intervals[index_finished]
-                # proceed_lower_bound_finished = proceed_lower_bounds[index_finished]
-                # fn_socres_finished = CRITICAL_FN_FACTOR / proceed_lower_bound_finished
-                # Dump Part 1.
+                index_propagate = (num_to_proceeds > 0)
+                # Dump.
                 fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
                 sub_result.append((sites, children_indexs, intervals, fn_scores))
                 new_size = num_to_proceeds.sum()
-                logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(index_finished))
+                logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
                 if new_size == 0:
                     break
-                ## Part 2.
+                ## Propagate.
                 logger.info('Propagating from %d edges(%d edges when finished.)...',
-                    np.count_nonzero(~index_finished), num_to_proceeds.sum())
-                sites = sites[~index_finished]
-                intervals = intervals[~index_finished]
-                children_indexs = children_indexs[~index_finished]
-                proceed_lower_bounds = proceed_lower_bounds[~index_finished]
-                to_proceeds = to_proceeds[~index_finished]
-                num_to_proceeds = num_to_proceeds[~index_finished]
+                    np.count_nonzero(index_propagate), num_to_proceeds.sum())
                 # Construct loop variable for next loop.
                 new_sites = np.empty(new_size, dtype=object)
                 new_intervals = np.empty(new_size, dtype='int64') 
                 new_children_indexs = np.empty(new_size, dtype=object)
                 new_proceed_lower_bounds = np.empty(new_size, dtype='float64')
                 start_index = 0
-                for i in range(len(sites)):
-                    current_site = sites[i]
-                    current_interval = intervals[i]
-                    current_children_indexs = children_indexs[i]
-                    current_proceed_lower_bound = proceed_lower_bounds[i]
+                for i in index_propagate.nonzero()[0]:
                     to_proceed = to_proceeds[i]
                     end_index = start_index + num_to_proceeds[i]
-                    next_children, next_intervals, next_probs_skip = index1[current_site]
+                    next_children, next_intervals, next_probs_skip = index1[sites[i]]
                     new_sites[start_index:end_index] = next_children[to_proceed]
-                    new_intervals[start_index:end_index] = current_interval + next_intervals[to_proceed]
+                    new_intervals[start_index:end_index] = intervals[i] + next_intervals[to_proceed]
                     for delta, next_child_index in enumerate(to_proceed.nonzero()[0]):
-                        new_children_indexs[start_index + delta] = current_children_indexs + [next_child_index]
-                    new_proceed_lower_bounds[start_index:end_index] = current_proceed_lower_bound / next_probs_skip[to_proceed]
+                        new_children_indexs[start_index + delta] = children_indexs[i] + [next_child_index]
+                    new_proceed_lower_bounds[start_index:end_index] = proceed_lower_bounds[i] / next_probs_skip[to_proceed]
                     start_index = end_index
                 # Update loop variable.
                 sites, intervals, children_indexs, proceed_lower_bounds =\
