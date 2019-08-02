@@ -188,7 +188,7 @@ class PathFinder:
             self._f_tensor[site_index][0][0] = site_index
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
     
-    def run(self):
+    def index_graph(self):
         logger.info('Build child index for all sites...')
         for site in self._sites.values():
             self._index_children(site)
@@ -280,7 +280,7 @@ def main():
     finder = PathFinder(args.rank)
     finder.load_graph_and_interval(sites, args.intervals)
     finder.loading_start_end_sites(args.start_sites, args.end_sites)
-    finder.run()
+    finder.index_graph()
     
 
 if __name__ == "__main__":
