@@ -9,7 +9,7 @@ import sys
 import math
 import pickle
 import numpy as np
-from numba import njit
+from numba import njit, vectorize
 
 # Global variable.
 logger = None
@@ -75,7 +75,7 @@ class PathFinder:
         return self._f_tensor(self._site_id_to_index[site_id])
 
     @staticmethod
-    @njit
+    @vectorize
     def prob_skip(interval):
         if interval < MERGE_LEN:
             return (1 - FN_RATE) * (interval / MERGE_LEN - 1) ** 2 + FN_RATE
@@ -97,8 +97,92 @@ class PathFinder:
         print(interval, interval_)
 
     def index_reachable_children(self):
-        pass
-             
+        index1 = {}
+        logger.info('Build index1 for all sites...')
+        for site in self._sites.values():
+            if site.children:
+                children_zip = zip(*site.children)
+                children = np.array(next(children_zip))
+                intervals = np.array(next(children_zip))
+                probs_skip = self.prob_skip(intervals)
+                index1[site] = children, intervals, probs_skip
+            else:
+                index1[site] = np.empty(0, dtype=object), np.empty(0, dtype='int64') , np.empty(0, dtype='float64')
+        logger.info('Build index2(Reachable sites) for all sites...')
+        index2 = {}
+        for site in self._sites.values():
+            logger.info('Processing site %s.', site.id)
+            sub_result = []
+            logger.info('Searching reachable sites for site %s...', site.id)
+            n_iter = 0
+            # Init loop variables.
+            sites, intervals, _ = index1[site]
+            children_indexs = np.empty(len(sites), dtype=object)
+            for i in range(len(children_indexs)):
+                children_indexs[i] = [i]
+            proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
+            logger.info('Init. %d edges.', len(sites))
+            while True:
+                # Divide loop variables into two parts.
+                to_proceeds = np.array([proceed_lower_bounds[i] < index1[sites[i]][2]
+                    for i in range(len(sites))])  # True means be able to propagate.
+                num_to_proceeds = np.array([np.count_nonzero(ele) for ele in to_proceeds])
+                index_finished = (num_to_proceeds == 0)
+                ## Part 1.
+                # sites_finished = sites[index_finished]
+                # children_indexed_finished = children_indexs[index_finished]
+                # intervals_finished = intervals[index_finished]
+                # proceed_lower_bound_finished = proceed_lower_bounds[index_finished]
+                # fn_socres_finished = CRITICAL_FN_FACTOR / proceed_lower_bound_finished
+                # Dump Part 1.
+                fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
+                sub_result.append((sites, children_indexs, intervals, fn_scores))
+                new_size = num_to_proceeds.sum()
+                logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(index_finished))
+                if new_size == 0:
+                    break
+                ## Part 2.
+                logger.info('Propagating from %d edges(%d edges when finished.)...',
+                    np.count_nonzero(~index_finished), num_to_proceeds.sum())
+                sites = sites[~index_finished]
+                intervals = intervals[~index_finished]
+                children_indexs = children_indexs[~index_finished]
+                proceed_lower_bounds = proceed_lower_bounds[~index_finished]
+                to_proceeds = to_proceeds[~index_finished]
+                num_to_proceeds = num_to_proceeds[~index_finished]
+                # Construct loop variable for next loop.
+                new_sites = np.empty(new_size, dtype=object)
+                new_intervals = np.empty(new_size, dtype='int64') 
+                new_children_indexs = np.empty(new_size, dtype=object)
+                new_proceed_lower_bounds = np.empty(new_size, dtype='float64')
+                start_index = 0
+                for i in range(len(sites)):
+                    current_site = sites[i]
+                    current_interval = intervals[i]
+                    current_children_indexs = children_indexs[i]
+                    current_proceed_lower_bound = proceed_lower_bounds[i]
+                    to_proceed = to_proceeds[i]
+                    end_index = start_index + num_to_proceeds[i]
+                    next_children, next_intervals, next_probs_skip = index1[current_site]
+                    new_sites[start_index:end_index] = next_children[to_proceed]
+                    new_intervals[start_index:end_index] = current_interval + next_intervals[to_proceed]
+                    for delta, next_child_index in enumerate(to_proceed.nonzero()[0]):
+                        new_children_indexs[start_index + delta] = current_children_indexs + [next_child_index]
+                    new_proceed_lower_bounds[start_index:end_index] = current_proceed_lower_bound / next_probs_skip[to_proceed]
+                    start_index = end_index
+                # Update loop variable.
+                sites, intervals, children_indexs, proceed_lower_bounds =\
+                    new_sites, new_intervals, new_children_indexs, new_proceed_lower_bounds
+                logger.info('Propagate Finished. Frontier contains %d edges.', len(sites))
+                n_iter += 1
+            # Build index2.
+            index2[site] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
+        logger.info('Index2 built.')
+        count = sum((len(ele[0]) for ele in index2.values()))
+        logger.info('%d site, %d edges.', len(index2), count)
+        example = next(iter(index2.values()))
+        print(example)
+        return index2
 
     @staticmethod
     @njit
@@ -209,8 +293,8 @@ def main():
     finder = PathFinder(args.rank)
     finder.load_graph_and_interval(sites, args.intervals)
     finder.loading_start_end_sites(args.start_sites, args.end_sites)
+    finder.index_reachable_children()
     
 
 if __name__ == "__main__":
-    print(dir(PathFinder))
-    PathFinder._test_prob_skip()
+    main()
