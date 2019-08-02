@@ -53,6 +53,8 @@ class PathFinder:
         self._site_id_to_index = {}
         self._site_id_to_reachable_children = {}
         self._log_sum = 0
+        self._child_index = {}
+        self._propagation_index = {}
 
     def load_graph_and_interval(self, sites, intervals):
         logger.info("Loading site graph and intervals ...")
@@ -96,76 +98,67 @@ class PathFinder:
         interval_ = PathFinder.prob_skip_inverse(prob)
         print(interval, interval_)
 
-    def index_reachable_children(self):
-        index1 = {}
-        logger.info('Build index1 for all sites...')
-        for site in self._sites.values():
-            if site.children:
-                children_zip = zip(*site.children)
-                children = np.array(next(children_zip))
-                intervals = np.array(next(children_zip))
-                probs_skip = self.prob_skip(intervals)
-                index1[site] = children, intervals, probs_skip
-            else:
-                index1[site] = np.empty(0, dtype=object), np.empty(0, dtype='int64') , np.empty(0, dtype='float64')
-        logger.info('Build index2(Reachable sites) for all sites...')
-        index2 = {}
-        for site in self._sites.values():
-            logger.info('Processing site %s.', site.id)
-            sub_result = []
-            logger.info('Searching reachable sites for site %s...', site.id)
-            n_iter = 0
-            # Init loop variables.
-            sites, intervals, _ = index1[site]
-            children_indexs = np.empty(len(sites), dtype=object)
-            for i in range(len(children_indexs)):
-                children_indexs[i] = [i]
-            proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
-            logger.info('Init. %d edges.', len(sites))
-            while True:
-                to_proceeds = np.array([proceed_lower_bounds[i] < index1[sites[i]][2]
-                    for i in range(len(sites))])  # True means be able to propagate.
-                num_to_proceeds = np.array([np.count_nonzero(ele) for ele in to_proceeds])
-                index_propagate = (num_to_proceeds > 0)
-                # Dump.
-                fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
-                sub_result.append((sites, children_indexs, intervals, fn_scores))
-                new_size = num_to_proceeds.sum()
-                logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
-                if new_size == 0:
-                    break
-                ## Propagate.
-                logger.info('Propagating from %d edges(%d edges when finished.)...',
-                    np.count_nonzero(index_propagate), num_to_proceeds.sum())
-                # Construct loop variable for next loop.
-                new_sites = np.empty(new_size, dtype=object)
-                new_intervals = np.empty(new_size, dtype='int64') 
-                new_children_indexs = np.empty(new_size, dtype=object)
-                new_proceed_lower_bounds = np.empty(new_size, dtype='float64')
-                start_index = 0
-                for i in index_propagate.nonzero()[0]:
-                    to_proceed = to_proceeds[i]
-                    end_index = start_index + num_to_proceeds[i]
-                    next_children, next_intervals, next_probs_skip = index1[sites[i]]
-                    new_sites[start_index:end_index] = next_children[to_proceed]
-                    new_intervals[start_index:end_index] = intervals[i] + next_intervals[to_proceed]
-                    for delta, next_child_index in enumerate(to_proceed.nonzero()[0]):
-                        new_children_indexs[start_index + delta] = children_indexs[i] + [next_child_index]
-                    new_proceed_lower_bounds[start_index:end_index] = proceed_lower_bounds[i] / next_probs_skip[to_proceed]
-                    start_index = end_index
-                # Update loop variable.
-                sites, intervals, children_indexs, proceed_lower_bounds =\
-                    new_sites, new_intervals, new_children_indexs, new_proceed_lower_bounds
-                logger.info('Propagate Finished. Frontier contains %d edges.', len(sites))
-                n_iter += 1
-            # Build index2.
-            index2[site] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
-        logger.info('Index2 built.')
-        count = sum((len(ele[0]) for ele in index2.values()))
-        logger.info('%d site, %d edges.', len(index2), count)
-        example = next(iter(index2.values()))
-        print(example)
-        return index2
+    def _index_children(self, site):
+        if site.children:
+            children_zip = zip(*site.children)
+            children = np.array(next(children_zip))
+            intervals = np.array(next(children_zip))
+            probs_skip = self.prob_skip(intervals)
+            self._child_index[site] = children, intervals, probs_skip
+        else:
+            self._child_index[site] = (
+                np.empty(0, dtype=object),
+                np.empty(0, dtype='int64'),
+                np.empty(0, dtype='float64')
+            )
+
+    def _index_propagation_route(self, site):
+        logger.info('Building propagation route for site %s.', site.id)
+        sub_result = []
+        n_iter = 0
+        # Init loop variables.
+        sites, intervals, _ = self._child_index[site]
+        children_indexs = np.empty(len(sites), dtype=object)
+        for i in range(len(children_indexs)):
+            children_indexs[i] = [i]
+        proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
+        logger.info('Init. %d edges.', len(sites))
+        while True:
+            to_proceeds = np.array([proceed_lower_bounds[i] < self._child_index[sites[i]][2]
+                for i in range(len(sites))])  # True means be able to propagate.
+            num_to_proceeds = np.array([np.count_nonzero(ele) for ele in to_proceeds])
+            index_propagate = (num_to_proceeds > 0)
+            # Dump.
+            fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
+            sub_result.append((sites, children_indexs, intervals, fn_scores))
+            new_size = num_to_proceeds.sum()
+            logger.info('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
+            if new_size == 0:
+                break
+            ## Propagate.
+            logger.info('Propagating from %d edges(%d edges when finished.)...',
+                np.count_nonzero(index_propagate), num_to_proceeds.sum())
+            # Construct loop variable for next loop.
+            new_sites = np.empty(new_size, dtype=object)
+            new_intervals = np.empty(new_size, dtype='int64') 
+            new_children_indexs = np.empty(new_size, dtype=object)
+            new_proceed_lower_bounds = np.empty(new_size, dtype='float64')
+            start_index = 0
+            for i in index_propagate.nonzero()[0]:
+                to_proceed = to_proceeds[i]
+                end_index = start_index + num_to_proceeds[i]
+                next_children, next_intervals, next_probs_skip = self._child_index[sites[i]]
+                new_sites[start_index:end_index] = next_children[to_proceed]
+                new_intervals[start_index:end_index] = intervals[i] + next_intervals[to_proceed]
+                for delta, next_child_index in enumerate(to_proceed.nonzero()[0]):
+                    new_children_indexs[start_index + delta] = children_indexs[i] + [next_child_index]
+                new_proceed_lower_bounds[start_index:end_index] = proceed_lower_bounds[i] / next_probs_skip[to_proceed]
+                start_index = end_index
+            # Update loop variable.
+            sites, intervals, children_indexs, proceed_lower_bounds =\
+                new_sites, new_intervals, new_children_indexs, new_proceed_lower_bounds
+            n_iter += 1
+        self._propagation_index[site] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
 
     @staticmethod
     @njit
@@ -196,7 +189,18 @@ class PathFinder:
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
     
     def run(self):
-        pass
+        logger.info('Build child index for all sites...')
+        for site in self._sites.values():
+            self._index_children(site)
+        logger.info('All site child index built.')
+            
+        logger.info('Build propagate for all sites...')
+        for site in self._sites.values():
+            self._index_propagation_route(site)
+        logger.info('All site propagation index built.')
+
+        count = sum((len(ele[0]) for ele in self._propagation_index.values()))
+        logger.info('%d site, %d edges.', len(self._propagation_index), count)
 
 
 def main():
@@ -276,7 +280,7 @@ def main():
     finder = PathFinder(args.rank)
     finder.load_graph_and_interval(sites, args.intervals)
     finder.loading_start_end_sites(args.start_sites, args.end_sites)
-    finder.index_reachable_children()
+    finder.run()
     
 
 if __name__ == "__main__":
