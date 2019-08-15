@@ -150,7 +150,7 @@ class PathFinder:
             sites, intervals, children_indexs, proceed_lower_bounds =\
                 new_sites, new_intervals, new_children_indexs, new_proceed_lower_bounds
             n_iter += 1
-        self._propagation_index[site] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
+        self._propagation_index[site.id] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
 
     @staticmethod
     @njit
