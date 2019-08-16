@@ -91,15 +91,17 @@ class PathFinder:
             return FN_RATE
 
     def _index_children(self, site):
+        site_index = self._site_id_to_index[site.id]
         if site.children:
             children_zip = zip(*site.children)
-            children = np.array(next(children_zip))
+            # children = np.array(next(children_zip))
+            children = np.array(list(map(self._site_id_to_index.get, map(lambda x: x.id, next(children_zip)))))
             intervals = np.array(next(children_zip))
             probs_skip = self.prob_skip(intervals)
-            self._child_index[site] = children, intervals, probs_skip
+            self._child_index[site_index] = children, intervals, probs_skip
         else:
-            self._child_index[site] = (
-                np.empty(0, dtype=object),
+            self._child_index[site_index] = (
+                np.empty(0, dtype='int64'),
                 np.empty(0, dtype='int64'),
                 np.empty(0, dtype='float64')
             )
@@ -108,30 +110,33 @@ class PathFinder:
         logger.debug('Building propagation route for site %s.', site.id)
         sub_result = []
         n_iter = 0
+        index = self._site_id_to_index[site.id] 
         # Init loop variables.
-        sites, intervals, _ = self._child_index[site]
-        children_indexs = np.empty(len(sites), dtype=object)
+        indexs, intervals, _ = self._child_index[index]
+        # sites, intervals, _ = self._child_index[site]
+        init_size = len(indexs)
+        children_indexs = np.empty(init_size, dtype=object)
         for i in range(len(children_indexs)):
             children_indexs[i] = [i]
-        proceed_lower_bounds = np.full(len(sites), CRITICAL_FN_FACTOR)
-        logger.debug('Init. %d edges.', len(sites))
+        proceed_lower_bounds = np.full(init_size, CRITICAL_FN_FACTOR)
+        logger.debug('Init. %d edges.', init_size)
         while True:
-            to_proceeds = np.array([proceed_lower_bounds[i] < self._child_index[sites[i]][2]
-                for i in range(len(sites))])  # True means be able to propagate.
+            to_proceeds = np.array([proceed_lower_bounds[i] < self._child_index[indexs[i]][2]
+                for i in range(len(indexs))])  # True means be able to propagate.
             num_to_proceeds = np.array([np.count_nonzero(ele) for ele in to_proceeds])
             index_propagate = (num_to_proceeds > 0)
             # Dump.
             fn_scores = CRITICAL_FN_FACTOR / proceed_lower_bounds
-            sub_result.append((sites, children_indexs, intervals, fn_scores))
+            sub_result.append((indexs, children_indexs, intervals, fn_scores))
             new_size = num_to_proceeds.sum()
-            logger.debug('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(sites))
+            logger.debug('#Length %d edges dumped: %d.', n_iter + 1, np.count_nonzero(indexs))
             if new_size == 0:
                 break
             ## Propagate.
             logger.debug('Propagating from %d edges(%d edges when finished.)...',
                 np.count_nonzero(index_propagate), num_to_proceeds.sum())
             # Construct loop variable for next loop.
-            new_sites = np.empty(new_size, dtype=object)
+            new_indexs = np.empty(new_size, dtype='int64')
             new_intervals = np.empty(new_size, dtype='int64') 
             new_children_indexs = np.empty(new_size, dtype=object)
             new_proceed_lower_bounds = np.empty(new_size, dtype='float64')
@@ -139,18 +144,18 @@ class PathFinder:
             for i in index_propagate.nonzero()[0]:
                 to_proceed = to_proceeds[i]
                 end_index = start_index + num_to_proceeds[i]
-                next_children, next_intervals, next_probs_skip = self._child_index[sites[i]]
-                new_sites[start_index:end_index] = next_children[to_proceed]
+                next_indexs, next_intervals, next_probs_skip = self._child_index[indexs[i]]
+                new_indexs[start_index:end_index] = next_indexs[to_proceed]
                 new_intervals[start_index:end_index] = intervals[i] + next_intervals[to_proceed]
                 for delta, next_child_index in enumerate(to_proceed.nonzero()[0]):
                     new_children_indexs[start_index + delta] = children_indexs[i] + [next_child_index]
                 new_proceed_lower_bounds[start_index:end_index] = proceed_lower_bounds[i] / next_probs_skip[to_proceed]
                 start_index = end_index
             # Update loop variable.
-            sites, intervals, children_indexs, proceed_lower_bounds =\
-                new_sites, new_intervals, new_children_indexs, new_proceed_lower_bounds
+            indexs, intervals, children_indexs, proceed_lower_bounds =\
+                new_indexs, new_intervals, new_children_indexs, new_proceed_lower_bounds
             n_iter += 1
-        self._propagation_index[site.id] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
+        self._propagation_index[index] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
 
     @staticmethod
     @njit
