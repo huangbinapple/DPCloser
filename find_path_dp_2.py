@@ -20,6 +20,8 @@ RANK = 10
 MERGE_LEN = 500
 FN_RATE = .228
 MAX_CONTINUE_FN = 1.9
+MAX_CONTINUE_FP = 2
+AVERAGE_INTERVAL = 1526000
 
 CRITICAL_FN_FACTOR = FN_RATE ** (MAX_CONTINUE_FN)
 
@@ -47,6 +49,7 @@ class PathFinder:
         self._p_tensor = None
         self._t_tensor = None
         self._f_tensor = None
+        self._intervals = None
         self._sites = None
         self._start_sites = set()
         self._end_sites = set()
@@ -55,6 +58,7 @@ class PathFinder:
         self._log_sum = 0
         self._child_index = {}
         self._propagation_index = {}
+        self._interval_index = []
 
     def load_graph(self, sites):
         logger.info("Loading site graph...")
@@ -66,12 +70,17 @@ class PathFinder:
 
     def load_intervals(self, intervals):
         assert self._sites
+        self._intervals = intervals
         logger.info("Loading site intervals...")
         shape = (len(self._sites), len(intervals) + 1, self._n_rank)
         self._p_tensor = np.zeros(shape, dtype='float32')
         self._t_tensor = np.empty(shape, dtype='object')
         self._f_tensor = np.zeros(shape, dtype='uint64')
         logger.info("Loaded %d intervals.", len(intervals))
+        self.index_intervals()
+
+    def site_ids(self, index):
+        return self._site_ids[index]
 
     def site_p_tensor(self, site_id):
         return self._p_tensor(self._site_id_to_index[site_id])
@@ -200,6 +209,25 @@ class PathFinder:
         count = sum((len(ele[0]) for ele in self._propagation_index.values()))
         logger.info('Graph index built, %d site, %d edges.', len(self._propagation_index), count)
 
+    def index_intervals(self):
+        logger.info('Indexing intervals...')
+        intervals_ = self._intervals[::-1]
+        result = []
+        for i in range(len(intervals_)):
+            interval = 0
+            intervals = []
+            fp_scores = []
+            for num_insert in range(MAX_CONTINUE_FP):
+                if i + num_insert >= len(intervals_):
+                    break
+                interval += intervals_[i + num_insert]
+                intervals.append(interval)
+                fp_score = poisson(interval / AVERAGE_INTERVAL, num_insert)
+                fp_scores.append(fp_score)
+                logger.debug('Prob of FN=%d in %d is %f', num_insert, interval, fp_score)
+            result.append((np.array(intervals), np.array(fp_scores)))
+            self._interval_index = result[::-1]
+        logger.info('Index intervals done.')
 
 def main():
     global MU
