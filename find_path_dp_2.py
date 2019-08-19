@@ -23,12 +23,14 @@ MAX_CONTINUE_FN = 1.9
 MAX_CONTINUE_FP = 2
 AVERAGE_INTERVAL = 1526000
 
+FIVE_SIGMA = 5 * SIGMA
+DECAY_INVERSE = math.sqrt(2) / SIGMA
 CRITICAL_FN_FACTOR = FN_RATE ** (MAX_CONTINUE_FN)
 
 HASH_A = 4343534
 HASH_B = 232423
-def update_fingerprint(original_fingerprint, child_index):
-    return (original_fingerprint + HASH_A) * (child_index + HASH_B)
+def poisson(lambda_, k):
+    return math.exp(-lambda_) * lambda_ ** k / math.factorial(k)
 
 class BackTracer:
 
@@ -54,7 +56,7 @@ class PathFinder:
         self._start_sites = set()
         self._end_sites = set()
         self._site_id_to_index = {}
-        self._site_id_to_reachable_children = {}
+        self._site_ids = []
         self._log_sum = 0
         self._child_index = {}
         self._propagation_index = {}
@@ -64,8 +66,8 @@ class PathFinder:
         logger.info("Loading site graph...")
         self._sites = sites
         logger.info("Loaded %d sites.", len(sites))
-        site_ids = sorted(list(sites.keys()))
-        self._site_id_to_index = {k: v for v, k in enumerate(site_ids)}
+        self._site_ids = sorted(list(sites.keys()))
+        self._site_id_to_index = {k: v for v, k in enumerate(self._site_ids)}
         self.index_graph()
 
     def load_intervals(self, intervals):
@@ -90,6 +92,23 @@ class PathFinder:
 
     def site_f_tensor(self, site_id):
         return self._f_tensor(self._site_id_to_index[site_id])
+    
+    @staticmethod
+    def similar_factor(length_reference, length_bionano):
+        """
+        Argument:
+            length_reference (numpy.array, size: m x 1, dtype: int):
+                path length in the site graph.
+            length_bionano (numpy.array, size: 1 x n):
+                intervals on bionano molecules. 
+        Return:
+            (numpy.array, size: `length_reference` operate `length_bionano`):
+                score factor represent the similarity between measured and reference length.
+        """
+        error = np.abs(length_bionano - (MU + length_reference))
+        # error = np.minimum(error, FIVE_SIGMA)
+        result = np.exp(- error * DECAY_INVERSE)
+        return result
 
     @staticmethod
     @vectorize
@@ -176,6 +195,130 @@ class PathFinder:
     
     def normalize(self, index):
         self._log_sum += self._normalize(index, self._p_tensor)
+
+    @staticmethod
+    def propagate_fingerprints(init_fingerprints, children_indexs):
+        logger.debug('Updating fingerprnits: %s ...', init_fingerprints)
+        result_fingerprints = np.empty(
+            shape=(children_indexs.shape[0], init_fingerprints.shape[0]),
+            dtype='uint64'
+        )
+        last_children_index_len = 0
+        memory = {}  # Values store the index of updated fingerprints in result_fingerprints.
+        for i, children_indexs_ in enumerate(children_indexs):
+            current_children_index_len = len(children_indexs_)
+            assert current_children_index_len >= last_children_index_len
+            last_children_index_len = current_children_index_len
+            if current_children_index_len > 1:
+                init_fingerprints_ = result_fingerprints[memory[tuple(children_indexs_[:-1])], :]
+            else:
+                init_fingerprints_ = init_fingerprints
+            memory[tuple(children_indexs_)] = i
+            result_fingerprints[i] = PathFinder.update_fingerprint(
+                init_fingerprints_, children_indexs_[-1])
+        logger.debug('%d fingerprint update completed!', len(children_indexs))
+        return result_fingerprints
+
+    @staticmethod
+    @njit
+    def update_fingerprint(init_fingerprints, child_index):
+        return (init_fingerprints + HASH_A) * (child_index + HASH_B)
+    
+    def find_path(self):
+        logger.info('Finding optical paths ...')
+        self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
+            self._site_ids, self._interval_index, self._propagation_index)
+
+    @staticmethod
+    # @njit
+    def _find_path(P, T, F, site_ids, interval_index, propagate_index, mini_prob=0):
+        mini_prob = 0
+        index_iter = 0
+        total_iter = len(interval_index)
+        for index_iter in range(total_iter):
+            logger.info('Finding progress %d/%d.', index_iter + 1, total_iter)
+            chosen_index = (P[:,index_iter,0] > mini_prob).nonzero()[0]
+            logger.info('%d site to propagate.', len(chosen_index))
+            for site_index in chosen_index:
+                PathFinder.propagate(P, T, F, site_ids, 
+                    site_index, index_iter, interval_index[index_iter], propagate_index[site_index])
+            break
+
+    @staticmethod
+    # @njit
+    def propagate(P, T, F, site_ids, site_index, index_iter, interval_index_content, propogate_index_content):
+        # Input.
+        site_id = site_ids[site_index]
+        logger.info('(Iter: %d) Propagating from site %s...', index_iter, site_id)
+        init_probs = P[site_index][index_iter]
+        init_fingerprints = F[site_index][index_iter]
+        target_indexs, children_indexs, reference_lengths, fn_scores = propogate_index_content
+        bionano_lengths, fp_scores = interval_index_content
+
+        propagate_factor = PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths) * \
+            fn_scores.reshape(-1, 1) * fp_scores
+        propagate_results = np.expand_dims(propagate_factor, axis=-1) * init_probs
+        updated_fingerprints = PathFinder.propagate_fingerprints(init_fingerprints, children_indexs)
+
+        # Action(Alter table.)
+        for target_index, children_indexs_, propagate_result, fingerprints in zip(
+                target_indexs, children_indexs, propagate_results, updated_fingerprints):
+            logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
+            logger.debug("Original P: %s", P[target_index][index_iter])
+            logger.debug("Original F: %s", F[target_index][index_iter])
+            logger.debug("Children indexs: %s", children_indexs_)
+            logger.debug("Propagate result: %s", propagate_result)
+            logger.debug("Fingerprint: %s", fingerprints)
+            tracker_info = PathFinder.merge(P[target_index][index_iter], propagate_result,
+                F[target_index][index_iter], fingerprints)
+            logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
+            logger.debug("Alterd P: %s", P[target_index][index_iter])
+            logger.debug("Alterd F: %s", F[target_index][index_iter])
+        # self.alter_table(index_iter, target_indexs, propagate_result, children_indexs,
+            # updated_fingerprints, site_index)
+        logger.debug('Propagation finished!')
+
+    @staticmethod
+    @njit
+    def merge(values_a, values_b, fingerprints_a, fingerprints_b):
+        size = values_a.shape[0]
+        assert len(values_b.shape) == 2
+        b_row = values_b.shape[0]
+        values_ab = np.concatenate((values_a, values_b.flatten()))
+        # logger.debug("value_ab: %s", values_ab)
+        fingerprints_b_repeat = np.empty_like(values_b, dtype=np.uint64)
+        for i in range(b_row):
+            fingerprints_b_repeat[i] = fingerprints_b
+        fingerprints_ab = np.concatenate((fingerprints_a, fingerprints_b_repeat.flatten()))
+        # logger.debug("fingerprints_ab: %s", fingerprints_ab)
+        index_sort = (-values_ab).argsort(kind='mergesort')  # Descend order.
+        # logger.debug("index_sort: %s", index_sort)
+        fingerprints_sorted_by_value = fingerprints_ab[index_sort]
+        # logger.debug("fingerprints_sorted_by_value: %s", fingerprints_sorted_by_value)
+
+        fingerprint_sort_index = fingerprints_sorted_by_value.argsort(kind='mergesort')  # Merge sort matters
+        # logger.debug("fingerprint_sort_index: %s", fingerprint_sort_index)
+        fingerprint_sorted = fingerprints_sorted_by_value[fingerprint_sort_index]
+        # logger.debug("fingerprint_sorted: %s", fingerprint_sorted)
+        flag = np.empty(len(fingerprint_sort_index), dtype=np.bool_)
+        flag[0] = True
+        flag[1:] = (fingerprint_sorted[1:] != fingerprint_sorted[:-1])
+        index_unique = fingerprint_sort_index[flag]
+        index_unique.sort()
+        # logger.debug("index_unique: %s", index_unique)
+
+        index_result = index_sort[index_unique[:size]]
+        # logger.debug("index_result: %s", index_result)
+        result_size = index_result.shape[0]
+        values_a[:result_size] = values_ab[index_result]
+        # logger.debug("Values altered in: %s", values_ab[index_result])
+        # logger.debug("Value alterd in data type: %s", values_ab.dtype)
+        # logger.debug("Value_a: %s", values_a)
+        # logger.debug("All zeros: %s", not any(values_a))
+        # logger.debug("Value a data type: %s", values_a.dtype)
+        fingerprints_a[:result_size] = fingerprints_ab[index_result]
+        # logger.debug("Fingerprint altered in: %s", fingerprints_ab[index_result])
+        return index_result
 
     def loading_start_end_sites(self, start_sites=[], end_sites=[]):
         assert not self._start_sites and not self._end_sites
@@ -307,6 +450,7 @@ def main():
     finder.load_graph(sites)
     finder.load_intervals(args.intervals)
     finder.loading_start_end_sites(args.start_sites, args.end_sites)
+    finder.find_path()
 
 
 if __name__ == "__main__":
