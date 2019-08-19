@@ -73,7 +73,7 @@ class PathFinder:
         self._intervals = intervals
         logger.info("Loading site intervals...")
         shape = (len(self._sites), len(intervals) + 1, self._n_rank)
-        self._p_tensor = np.zeros(shape, dtype='float32')
+        self._p_tensor = np.zeros(shape)
         self._t_tensor = np.empty(shape, dtype='object')
         self._f_tensor = np.zeros(shape, dtype='uint64')
         logger.info("Loaded %d intervals.", len(intervals))
