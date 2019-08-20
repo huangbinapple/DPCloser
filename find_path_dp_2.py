@@ -43,15 +43,18 @@ def find_none(ndarray):
 
 class BackTracer:
 
-    def __init__(self, site_id='', x=-1, y=-1, child_index=-1):
-        self.site_id = site_id
-        self.x = x
-        self.y = y
-        self.child_index = child_index
+    def __init__(self, site_index=-1, delta_x=0, delta_y=-1, child_indexs=[]):
+        self.site_index = site_index
+        self.delta_x = delta_x
+        self.delta_y = delta_y
+        self.child_indexs = child_indexs
 
     @property
     def is_start(self):
-        return True if self.site_id == '' else False
+        return True if self.site_index == -1 else False
+
+    def __str__(self):
+        return str((self.site_index, self.delta_x, self.delta_y, self.child_indexs))
 
 class PathFinder:
 
