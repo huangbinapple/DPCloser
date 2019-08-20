@@ -237,7 +237,7 @@ class PathFinder:
         return (init_fingerprints + HASH_A) * (child_index + HASH_B)
     
     def find_path(self):
-        logger.info('Finding optical paths ...')
+        logger.info('Finding optimal paths ...')
         self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
             self._site_ids, self._interval_index, self._propagation_index)
 
