@@ -32,6 +32,15 @@ HASH_B = 232423
 def poisson(lambda_, k):
     return math.exp(-lambda_) * lambda_ ** k / math.factorial(k)
 
+def find_none(ndarray):
+    size = ndarray.shape[0]
+    i = 0
+    while i < size:
+        if None is ndarray[i]:
+            return i
+        i += 1
+    return i
+
 class BackTracer:
 
     def __init__(self, site_id='', x=-1, y=-1, child_index=-1):
@@ -250,6 +259,8 @@ class PathFinder:
         # Input.
         site_id = site_ids[site_index]
         logger.info('(Iter: %d) Propagating from site %s...', index_iter, site_id)
+        num_propagate = find_none(T[site_index][index_iter])
+        # logger.debug("num_propagate: %d", num_propagate)
         init_probs = P[site_index][index_iter]
         init_fingerprints = F[site_index][index_iter]
         target_indexs, children_indexs, reference_lengths, fn_scores = propogate_index_content
@@ -263,33 +274,41 @@ class PathFinder:
         # Action(Alter table.)
         for target_index, children_indexs_, propagate_result, fingerprints in zip(
                 target_indexs, children_indexs, propagate_results, updated_fingerprints):
+            tracker = T[target_index][index_iter + 1]
+            num_already_here = find_none(tracker)
+            logger.debug('num_already_here: %d', num_already_here)
             logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
-            logger.debug("Original P: %s", P[target_index][index_iter])
-            logger.debug("Original F: %s", F[target_index][index_iter])
+            logger.debug("Original P: %s", P[target_index][index_iter + 1])
+            logger.debug("Original F: %s", F[target_index][index_iter + 1])
             logger.debug("Children indexs: %s", children_indexs_)
             logger.debug("Propagate result: %s", propagate_result)
             logger.debug("Fingerprint: %s", fingerprints)
-            tracker_info = PathFinder.merge(P[target_index][index_iter], propagate_result,
-                F[target_index][index_iter], fingerprints)
+            tracker_info = PathFinder.merge(P[target_index][index_iter + 1], propagate_result,
+                F[target_index][index_iter + 1], fingerprints, num_already_here, num_propagate)
             logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
-            logger.debug("Alterd P: %s", P[target_index][index_iter])
-            logger.debug("Alterd F: %s", F[target_index][index_iter])
+            logger.debug("Alterd P: %s", P[target_index][index_iter + 1])
+            logger.debug("Alterd F: %s", F[target_index][index_iter + 1])
+            # Update tracker.
+            # TODO
+             
         # self.alter_table(index_iter, target_indexs, propagate_result, children_indexs,
             # updated_fingerprints, site_index)
         logger.debug('Propagation finished!')
 
     @staticmethod
     @njit
-    def merge(values_a, values_b, fingerprints_a, fingerprints_b):
+    def merge(values_a, values_b, fingerprints_a, fingerprints_b, n_valid_a, n_valid_b):
         size = values_a.shape[0]
+        # logger.debug('n_valid_a: %d', n_valid_a)
+        # logger.debug('n_valid_b: %d', n_valid_b)
         assert len(values_b.shape) == 2
         b_row = values_b.shape[0]
-        values_ab = np.concatenate((values_a, values_b.flatten()))
+        values_ab = np.concatenate((values_a[:n_valid_a], values_b[:, :n_valid_b].flatten()))
         # logger.debug("value_ab: %s", values_ab)
-        fingerprints_b_repeat = np.empty_like(values_b, dtype=np.uint64)
+        fingerprints_b_repeat = np.empty((b_row, n_valid_b), dtype=np.uint64)
         for i in range(b_row):
-            fingerprints_b_repeat[i] = fingerprints_b
-        fingerprints_ab = np.concatenate((fingerprints_a, fingerprints_b_repeat.flatten()))
+            fingerprints_b_repeat[i] = fingerprints_b[:n_valid_b]
+        fingerprints_ab = np.concatenate((fingerprints_a[:n_valid_a], fingerprints_b_repeat.flatten()))
         # logger.debug("fingerprints_ab: %s", fingerprints_ab)
         index_sort = (-values_ab).argsort(kind='mergesort')  # Descend order.
         # logger.debug("index_sort: %s", index_sort)
@@ -310,8 +329,9 @@ class PathFinder:
         index_result = index_sort[index_unique[:size]]
         # logger.debug("index_result: %s", index_result)
         result_size = index_result.shape[0]
-        values_a[:result_size] = values_ab[index_result]
+        # logger.debug('result size: %d', result_size)
         # logger.debug("Values altered in: %s", values_ab[index_result])
+        values_a[:result_size] = values_ab[index_result]
         # logger.debug("Value alterd in data type: %s", values_ab.dtype)
         # logger.debug("Value_a: %s", values_a)
         # logger.debug("All zeros: %s", not any(values_a))
