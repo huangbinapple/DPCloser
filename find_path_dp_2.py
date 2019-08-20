@@ -292,7 +292,19 @@ class PathFinder:
             logger.debug("Alterd P: %s", P[target_index][index_iter + 1])
             logger.debug("Alterd F: %s", F[target_index][index_iter + 1])
             # Update tracker.
-            # TODO
+            tracker = tracker[:tracker_info.shape[0]]
+            tracker_keep_index = (tracker_info < num_already_here)
+            tracker[tracker_keep_index] = tracker[tracker_info[tracker_keep_index]]
+            tracker[~ tracker_keep_index] = tuple(map(
+                lambda x:
+                BackTracer(
+                    site_index,
+                    - (x - num_already_here) // num_propagate - 1,
+                    (x - num_already_here) % num_propagate,
+                    children_indexs_
+                ),
+                tracker_info[~ tracker_keep_index]
+            ))
              
         logger.debug('Propagation finished!')
 
