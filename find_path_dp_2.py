@@ -279,8 +279,8 @@ class PathFinder:
                 target_indexs, children_indexs, propagate_results, updated_fingerprints):
             tracker = T[target_index][index_iter + 1]
             num_already_here = find_none(tracker)
-            logger.debug('num_already_here: %d', num_already_here)
             logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
+            logger.debug('num_already_here: %d', num_already_here)
             logger.debug("Original P: %s", P[target_index][index_iter + 1])
             logger.debug("Original F: %s", F[target_index][index_iter + 1])
             logger.debug("Children indexs: %s", children_indexs_)
@@ -294,8 +294,6 @@ class PathFinder:
             # Update tracker.
             # TODO
              
-        # self.alter_table(index_iter, target_indexs, propagate_result, children_indexs,
-            # updated_fingerprints, site_index)
         logger.debug('Propagation finished!')
 
     @staticmethod
@@ -394,6 +392,7 @@ class PathFinder:
             result.append((np.array(intervals), np.array(fp_scores)))
             self._interval_index = result[::-1]
         logger.info('Index intervals done.')
+        logger.debug('Interval index: %s', self._interval_index)
 
 def main():
     global MU
