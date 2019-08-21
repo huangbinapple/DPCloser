@@ -56,6 +56,9 @@ class BackTracer:
     def __str__(self):
         return str((self.site_index, self.delta_x, self.delta_y, self.child_indexs))
 
+    def __repr__(self):
+        return str(self)
+
 class PathFinder:
 
     def __init__(self, nrank):
