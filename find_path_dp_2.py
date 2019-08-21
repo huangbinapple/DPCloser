@@ -302,12 +302,16 @@ class PathFinder:
                 lambda x:
                 BackTracer(
                     site_index,
-                    - (x - num_already_here) // num_propagate - 1,
+                    - (x - num_already_here) // num_propagate,
                     (x - num_already_here) % num_propagate,
                     children_indexs_
                 ),
                 tracker_info[~ tracker_keep_index]
             ))
+            logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
+            logger.debug("Altered P: %s", P[target_index][index_iter + 1])
+            logger.debug("Altered F: %s", F[target_index][index_iter + 1])
+            logger.debug("Altered T: %s", T[target_index][index_iter + 1])
              
         logger.debug('Propagation finished!')
 
