@@ -360,7 +360,7 @@ class PathFinder:
         # logger.debug("Fingerprint altered in: %s", fingerprints_ab[index_result])
         return index_result
 
-    def loading_start_end_sites(self, start_sites=[], end_sites=[]):
+    def load_start_end_sites(self, start_sites=[], end_sites=[]):
         assert not self._start_sites and not self._end_sites
         if not start_sites:
             start_sites = set(self._site_id_to_index.values())
@@ -490,7 +490,7 @@ def main():
     finder = PathFinder(args.rank)
     finder.load_graph(sites)
     finder.load_intervals(args.intervals)
-    finder.loading_start_end_sites(args.start_sites, args.end_sites)
+    finder.load_start_end_sites(args.start_sites, args.end_sites)
     finder.find_path()
 
 
