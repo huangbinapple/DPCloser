@@ -201,15 +201,21 @@ class PathFinder:
         self._propagation_index[index] = tuple((np.concatenate(ele) for ele in zip(*sub_result)))
 
     @staticmethod
-    @njit
+    # @njit
     def _normalize(index, tensor):
+        logger.debug('Normalize on: %s', tensor[:, index, 0])
+        logger.debug("All zeros: %s", not any(tensor[:, index, 0]))
         sum_ = tensor[:, index, 0].sum()
         sum_inverse = 1 / sum_
         tensor[:, index, :] *= sum_inverse
-        return np.log2(sum_)
+        logger.debug('Row %d sum: %d', index, sum_)
+        logger.debug('Row %d sum_inverse: %d', index, sum_inverse)
+        return sum_
     
     def normalize(self, index):
-        self._log_sum += self._normalize(index, self._p_tensor)
+        total_sum = self._normalize(index, self._p_tensor)
+        self._log_sum += np.log2(total_sum)
+        return total_sum
 
     @staticmethod
     def propagate_fingerprints(init_fingerprints, children_indexs):
