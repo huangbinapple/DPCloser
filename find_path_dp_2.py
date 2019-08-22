@@ -248,8 +248,10 @@ class PathFinder:
     
     def find_path(self):
         logger.info('Finding optimal paths ...')
-        self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
-            self._site_ids, self._interval_index, self._propagation_index)
+        log_sum = self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
+            self._site_ids, self._interval_index, self._propagation_index, mini_prob=1e-5)
+        self._log_sum += log_sum
+        logger.info('Find paths complete, log sum is %d', self._log_sum)
 
     @staticmethod
     # @njit
