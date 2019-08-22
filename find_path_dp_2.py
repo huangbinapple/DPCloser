@@ -256,7 +256,6 @@ class PathFinder:
     @staticmethod
     # @njit
     def _find_path(P, T, F, site_ids, interval_index, propagate_index, mini_prob=0):
-        mini_prob = 0
         index_iter = 0
         total_iter = len(interval_index)
         log_sum = 0
