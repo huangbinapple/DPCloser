@@ -204,6 +204,7 @@ class PathFinder:
     # @njit
     def _normalize(index, tensor):
         logger.debug('Normalize on: %s', tensor[:, index, 0])
+        logger.debug('Normalize on(sorted): %s', np.sort(tensor[:, index, 0])[::-1])
         logger.debug("All zeros: %s", not any(tensor[:, index, 0]))
         sum_ = tensor[:, index, 0].sum()
         sum_inverse = 1 / sum_
@@ -256,6 +257,10 @@ class PathFinder:
         mini_prob = 0
         index_iter = 0
         total_iter = len(interval_index)
+        log_sum = 0
+        logger.info('Probability distribution of #%d site in site graph nodes %s', 0,
+            sorted(list(zip([site_ids[id_] for id_ in P[:, 0, 0].nonzero()[0]],
+            P[:, index_iter, 0][P[:, 0, 0].nonzero()[0]])), key=lambda x: x[1], reverse=True))
         for index_iter in range(total_iter):
             logger.info('Finding progress %d/%d.', index_iter + 1, total_iter)
             chosen_index = (P[:,index_iter,0] > mini_prob).nonzero()[0]
@@ -263,8 +268,14 @@ class PathFinder:
             for site_index in chosen_index:
                 PathFinder.propagate(P, T, F, site_ids, 
                     site_index, index_iter, interval_index[index_iter], propagate_index[site_index])
-            break
-
+            normalize_sum = PathFinder._normalize(index_iter + 1, P)
+            logger.info('Probability distribution of #%d site in site graph nodes %s', index_iter + 1,
+                sorted(list(zip([site_ids[id_] for id_ in P[:, index_iter + 1, 0].nonzero()[0]],
+                P[:, index_iter + 1, 0][P[:, index_iter + 1, 0].nonzero()[0]])), key=lambda x: x[1], reverse=True))
+            log_sum += np.log2(normalize_sum)
+            # break
+        return log_sum
+            
     @staticmethod
     # @njit
     def propagate(P, T, F, site_ids, site_index, index_iter, interval_index_content, propogate_index_content):
@@ -272,7 +283,7 @@ class PathFinder:
         site_id = site_ids[site_index]
         logger.info('(Iter: %d) Propagating from site %s...', index_iter, site_id)
         num_propagate = find_none(T[site_index][index_iter])
-        # logger.debug("num_propagate: %d", num_propagate)
+        logger.debug("num_propagate: %d", num_propagate)
         init_probs = P[site_index][index_iter]
         init_fingerprints = F[site_index][index_iter]
         target_indexs, children_indexs, reference_lengths, fn_scores = propogate_index_content
@@ -280,6 +291,13 @@ class PathFinder:
 
         propagate_factor = PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths) * \
             fn_scores.reshape(-1, 1) * fp_scores
+        logger.debug('Defactor propagate factor:')
+        logger.debug('reference lengths: %s', reference_lengths.reshape(-1, 1))
+        logger.debug('Bionano lengths: %s', bionano_lengths)
+        logger.debug('Similate factor: %s', PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths))
+        logger.debug('fn_scores: %s', fn_scores.reshape(-1, 1))
+        logger.debug('fp_scores: %s', fp_scores)
+        logger.debug('Propagate factors: %s', propagate_factor)
         propagate_results = np.expand_dims(propagate_factor, axis=-1) * init_probs
         updated_fingerprints = PathFinder.propagate_fingerprints(init_fingerprints, children_indexs)
 
@@ -292,14 +310,12 @@ class PathFinder:
             logger.debug('num_already_here: %d', num_already_here)
             logger.debug("Original P: %s", P[target_index][index_iter + 1])
             logger.debug("Original F: %s", F[target_index][index_iter + 1])
+            logger.debug("Original T: %s", T[target_index][index_iter + 1])
             logger.debug("Children indexs: %s", children_indexs_)
             logger.debug("Propagate result: %s", propagate_result)
             logger.debug("Fingerprint: %s", fingerprints)
             tracker_info = PathFinder.merge(P[target_index][index_iter + 1], propagate_result,
                 F[target_index][index_iter + 1], fingerprints, num_already_here, num_propagate)
-            logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
-            logger.debug("Alterd P: %s", P[target_index][index_iter + 1])
-            logger.debug("Alterd F: %s", F[target_index][index_iter + 1])
             # Update tracker.
             tracker = tracker[:tracker_info.shape[0]]
             tracker_keep_index = (tracker_info < num_already_here)
@@ -382,6 +398,7 @@ class PathFinder:
             self._t_tensor[site_index][0][0] = BackTracer()
             self._f_tensor[site_index][0][0] = site_index
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
+        self.normalize(0)
     
     def index_graph(self):
         logger.info('Indexing graph...')
