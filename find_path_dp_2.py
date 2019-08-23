@@ -41,7 +41,7 @@ def find_none(ndarray):
         i += 1
     return i
 
-class BackTracer:
+class Tracker:
 
     def __init__(self, site_index=-1, delta_x=0, y=-1, child_indexs=[]):
         self.site_index = site_index
@@ -337,7 +337,7 @@ class PathFinder:
             tracker[tracker_keep_index] = tracker[tracker_info[tracker_keep_index]]
             tracker[~ tracker_keep_index] = tuple(map(
                 lambda x:
-                BackTracer(
+                Tracker(
                     site_index,
                     (x - num_already_here) // num_propagate + 1,
                     (x - num_already_here) % num_propagate,
@@ -421,7 +421,7 @@ class PathFinder:
         init_prob = 1 / len(start_sites)
         for site_index in map(self._site_id_to_index.get, start_sites):
             self._p_tensor[site_index][0][0] = init_prob
-            self._t_tensor[site_index][0][0] = BackTracer()
+            self._t_tensor[site_index][0][0] = Tracker()
             self._f_tensor[site_index][0][0] = site_index
         logger.info('Loaded %d start sites and %d end sites.', len(start_sites), len(end_sites))
         self.normalize(0)
