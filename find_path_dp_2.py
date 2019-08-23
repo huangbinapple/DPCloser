@@ -209,8 +209,8 @@ class PathFinder:
         sum_ = tensor[:, index, 0].sum()
         sum_inverse = 1 / sum_
         tensor[:, index, :] *= sum_inverse
-        logger.debug('Row %d sum: %d', index, sum_)
-        logger.debug('Row %d sum_inverse: %d', index, sum_inverse)
+        logger.debug('Row %d sum: %f', index, sum_)
+        logger.debug('Row %d sum_inverse: %f', index, sum_inverse)
         return sum_
     
     def normalize(self, index):
