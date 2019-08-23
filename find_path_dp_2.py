@@ -43,10 +43,10 @@ def find_none(ndarray):
 
 class BackTracer:
 
-    def __init__(self, site_index=-1, delta_x=0, delta_y=-1, child_indexs=[]):
+    def __init__(self, site_index=-1, delta_x=0, y=-1, child_indexs=[]):
         self.site_index = site_index
         self.delta_x = delta_x
-        self.delta_y = delta_y
+        self.y = y
         self.child_indexs = child_indexs
 
     @property
@@ -54,7 +54,7 @@ class BackTracer:
         return True if self.site_index == -1 else False
 
     def __str__(self):
-        return str((self.site_index, self.delta_x, self.delta_y, self.child_indexs))
+        return str((self.site_index, self.delta_x, self.y, self.child_indexs))
 
     def __repr__(self):
         return str(self)
@@ -76,6 +76,10 @@ class PathFinder:
         self._child_index = {}
         self._propagation_index = {}
         self._interval_index = []
+
+    @property
+    def num_bionano_sites(self):
+        return len(self._intervals) + 1
 
     def load_graph(self, sites):
         logger.info("Loading site graph...")
@@ -249,9 +253,20 @@ class PathFinder:
     def find_path(self):
         logger.info('Finding optimal paths ...')
         log_sum = self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
-            self._site_ids, self._interval_index, self._propagation_index, mini_prob=1e-5)
+            self._site_ids, self._interval_index, self._propagation_index)
         self._log_sum += log_sum
-        logger.info('Find paths complete, log sum is %d', self._log_sum)
+        logger.info('Find paths complete, log sum is %f', self._log_sum)
+        end_site = next(iter(self._end_sites))
+        end_site_index = self._site_id_to_index[end_site]
+        trackers = self._t_tensor[end_site_index][self.num_bionano_sites - 1]
+        result = []
+        for i, tracker in enumerate(trackers):
+            if tracker:
+                result.append(self.back_track(end_site_index, self.num_bionano_sites - 1, i))
+        logger.info('Start sites: %s, end sites: %s', self._start_sites, self._end_sites)
+        for trackers in result:
+            logger.info('Trackers: %s', list(zip(trackers, [self.site_ids(t.site_index) for t in trackers])))
+        
 
     @staticmethod
     # @njit
@@ -274,7 +289,6 @@ class PathFinder:
                 sorted(list(zip([site_ids[id_] for id_ in P[:, index_iter + 1, 0].nonzero()[0]],
                 P[:, index_iter + 1, 0][P[:, index_iter + 1, 0].nonzero()[0]])), key=lambda x: x[1], reverse=True))
             log_sum += np.log2(normalize_sum)
-            # break
         return log_sum
             
     @staticmethod
@@ -325,7 +339,7 @@ class PathFinder:
                 lambda x:
                 BackTracer(
                     site_index,
-                    - (x - num_already_here) // num_propagate,
+                    (x - num_already_here) // num_propagate + 1,
                     (x - num_already_here) % num_propagate,
                     children_indexs_
                 ),
@@ -335,8 +349,19 @@ class PathFinder:
             logger.debug("Altered P: %s", P[target_index][index_iter + 1])
             logger.debug("Altered F: %s", F[target_index][index_iter + 1])
             logger.debug("Altered T: %s", T[target_index][index_iter + 1])
-             
-        logger.debug('Propagation finished!')
+        logger.info('Propagation finished!')
+
+    def back_track(self, site_index, row, col):
+        current_tracker = self._t_tensor[site_index][row][col]
+        trackers = []
+        while not current_tracker.is_start:
+            trackers.append(current_tracker)
+            site_index = current_tracker.site_index
+            row -= current_tracker.delta_x
+            col = current_tracker.y
+            current_tracker = self._t_tensor[site_index][row][col]
+        trackers.reverse()
+        return trackers
 
     @staticmethod
     @njit
