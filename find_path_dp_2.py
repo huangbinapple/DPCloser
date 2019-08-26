@@ -256,16 +256,33 @@ class PathFinder:
             self._site_ids, self._interval_index, self._propagation_index)
         self._log_sum += log_sum
         logger.info('Find paths complete, log sum is %f', self._log_sum)
-        end_site = next(iter(self._end_sites))
-        end_site_index = self._site_id_to_index[end_site]
-        trackers = self._t_tensor[end_site_index][self.num_bionano_sites - 1]
+
+        # Intergrate.
+        end_site_indexs = np.array(list(map(self._site_id_to_index.get, self._end_sites)))
+        print(end_site_indexs[:10])
+        final_probs = self._p_tensor[end_site_indexs, -1].flatten()
+        final_trackers = self._t_tensor[end_site_indexs, -1].flatten()
+        index_sort = final_probs.argsort()[::-1][:self._n_rank]
+        final_probs = final_probs[index_sort]
+        final_trackers = final_trackers[index_sort]
+        final_probs /= final_probs.sum()
+        end_site_indexs = end_site_indexs[index_sort // self._n_rank]
+        probs = final_probs
+        trackers = final_trackers
+        
+        # end_site = next(iter(self._end_sites))
+        # end_site_index = self._site_id_to_index[end_site]
+        # trackers = self._t_tensor[end_site_index][self.num_bionano_sites - 1]
+        # probs = self._p_tensor[end_site_index][self.num_bionano_sites - 1]
+        # probs /= probs.sum()
+        logger.info('Final probs: %s', probs)
         result = []
-        for i, tracker in enumerate(trackers):
+        for end_site_index, tracker in zip(end_site_indexs, trackers):
             if tracker:
-                result.append(self.back_track(end_site_index, self.num_bionano_sites - 1, i))
+                result.append((self.site_ids(end_site_index), self.back_track(tracker, self.num_bionano_sites - 1)))
         logger.info('Start sites: %s, end sites: %s', self._start_sites, self._end_sites)
-        for trackers in result:
-            logger.info('Trackers: %s', list(zip(trackers, [self.site_ids(t.site_index) for t in trackers])))
+        for end_site_index, trackers in result:
+            logger.info('Trackers: %s, %s', end_site_index, list(zip(trackers, [self.site_ids(t.site_index) for t in trackers])))
         
 
     @staticmethod
@@ -351,8 +368,9 @@ class PathFinder:
             logger.debug("Altered T: %s", T[target_index][index_iter + 1])
         logger.info('Propagation finished!')
 
-    def back_track(self, site_index, row, col):
-        current_tracker = self._t_tensor[site_index][row][col]
+    def back_track(self, init_tracker, row):
+        row = row
+        current_tracker = init_tracker
         trackers = []
         while not current_tracker.is_start:
             trackers.append(current_tracker)
@@ -409,12 +427,6 @@ class PathFinder:
         return index_result
 
     def load_start_end_sites(self, start_sites=[], end_sites=[]):
-        assert not self._start_sites and not self._end_sites
-        if not start_sites:
-            start_sites = set(self._site_id_to_index.values())
-        if not end_sites:
-            end_sites = set(self._site_id_to_index.values())
-            
         logger.info('Loading start sites and end sites: %s, %s.', str(start_sites), str(end_sites))
         self._start_sites.update(start_sites)
         self._end_sites.update(end_sites)
@@ -475,11 +487,11 @@ def main():
         metavar='INPUT_FILE', help='A pickle file.')
 
     parser.add_argument('--start_sites',
-        required=True, type=lambda x: [ele for ele in x.split(',')],
+        type=lambda x: [ele for ele in x.split(',')],
         metavar='START_SITE_ID', help='All possible start site ids, split by comma.')
 
     parser.add_argument('--end_sites',
-        required=True, type=lambda x: [ele for ele in x.split(',')],
+        type=lambda x: [ele for ele in x.split(',')],
         metavar='END_SITE_ID', help='All possible end site ids, split by comma.')
 
     parser.add_argument('--intervals',
@@ -521,6 +533,18 @@ def main():
     ))
     logger.addHandler(file_stream)
     
+    logger.info('Reading graph files...')
+    nodes = pickle.load(args.graph_file)
+    sites = pickle.load(args.graph_file)
+    logger.info('Loaded an assembly graph, containing %d nodes.', len(nodes))
+    logger.info('Loaded a site graph, containing %d sites.', len(sites))
+    # args.graph_file.close()  # Needed?
+
+    if not args.start_sites:
+        args.start_sites = set(sites.keys())
+    if not args.end_sites:
+        args.end_sites = set(sites.keys())
+        
     logger.info('Input command: %s', ' '.join(sys.argv))
     logger.info('Gap name: %s', args.gap_name)
     logger.info('SIGMA: %d', SIGMA)
@@ -528,13 +552,6 @@ def main():
     logger.info('Start site ids (%d ids): %s', len(args.start_sites), args.start_sites)
     logger.info('End site ids (%d ids): %s', len(args.end_sites), args.end_sites)
     logger.info('Measurements (%d intervals): %s', len(args.intervals), args.intervals)
-
-    logger.info('Reading graph files...')
-    nodes = pickle.load(args.graph_file)
-    sites = pickle.load(args.graph_file)
-    logger.info('Loaded an assembly graph, containing %d nodes.', len(nodes))
-    logger.info('Loaded a site graph, containing %d sites.', len(sites))
-    # args.graph_file.close()  # Needed?
 
     finder = PathFinder(args.rank)
     finder.load_graph(sites)
