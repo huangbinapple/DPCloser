@@ -285,14 +285,26 @@ class PathFinder:
             if tracker:
                 result.append((self.site_ids(end_site_index), self.back_track(tracker, self.num_bionano_sites - 1)))
         logger.info('Start sites: %s, end sites: %s', self._start_sites, self._end_sites)
+        node_paths = []
         for end_site_index, trackers in result:
             logger.info('Trackers: %s, %s', end_site_index, list(zip(trackers, [self.site_ids(t.site_index) for t in trackers])))
             site_path = self.get_site_path(trackers)
             for ele in site_path:
                 logger.info(ele)
-            errors = list(zip(*site_path[:-1]))[-1]
+            tokens = list(zip(*site_path[:-1]))
+            errors, sub_node_paths = tokens[5: 7]
             logger.info('delta mean: %f', statistics.mean(errors))
             logger.info('delta std: %f', statistics.stdev(errors))
+            flat_list = []
+            for i in sub_node_paths:
+                for j in i:
+                    flat_list.append(j)
+            node_path = flat_list[0].copy()
+            for sub_node_path in flat_list[1:]:
+                node_path.extend(sub_node_path[1:])
+            node_paths.append(node_path)
+            logger.info('Node path: %s', node_path)
+        return node_paths
         
 
     @staticmethod
@@ -393,11 +405,13 @@ class PathFinder:
     def _get_next_site(current_site, child_indexs):
         sites = []
         intervals = []
+        node_paths = []
         for child_index in child_indexs:
             sites.append(current_site)
-            current_site, interval, _, _ = current_site.children[child_index]
+            current_site, interval, nodes, _ = current_site.children[child_index]
             intervals.append(interval)
-        return current_site, sites, intervals
+            node_paths.append(nodes)
+        return current_site, sites, intervals, node_paths
 
     def get_site_path(self, trackers):
         result = []
@@ -408,11 +422,12 @@ class PathFinder:
                 assert next_site.id == self.site_ids(tracker.site_index)
             site_id = self.site_ids(tracker.site_index)
             site = self._sites[site_id]
-            next_site, sub_site_path, sub_intervals = self._get_next_site(site, tracker.child_indexs)
+            next_site, sub_site_path, sub_intervals, nodes = self._get_next_site(site, tracker.child_indexs)
             bionano_sub_intervals = self._intervals[bionano_index: bionano_index + tracker.delta_x]
             bionano_index += tracker.delta_x
             error = sum(bionano_sub_intervals) - sum(sub_intervals)
-            result.append((site_id, tracker.child_indexs, sub_site_path, bionano_sub_intervals, sub_intervals, error))
+            result.append((site_id, tracker.child_indexs, sub_site_path, bionano_sub_intervals, sub_intervals, error, nodes))
+        
         last_site = next_site
         result.append(last_site.id)
         return result
@@ -566,6 +581,10 @@ def main():
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     ))
     logger.addHandler(file_stream)
+
+    logger.info(' '.join(sys.argv))
+    output_file_name = args.gap_name + '.txt'
+    logger.info('Output file is: %s', output_file_name)
     
     logger.info('Reading graph files...')
     nodes = pickle.load(args.graph_file)
@@ -591,7 +610,10 @@ def main():
     finder.load_graph(sites)
     finder.load_intervals(args.intervals)
     finder.load_start_end_sites(args.start_sites, args.end_sites)
-    finder.find_path()
+    node_path = finder.find_path()[0]
+
+    with open(output_file_name, 'w') as fout:
+        fout.write(':'.join((node.uid for node in node_path)))
 
 
 if __name__ == "__main__":
