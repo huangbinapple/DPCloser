@@ -10,6 +10,7 @@ import math
 import pickle
 import numpy as np
 from numba import njit, vectorize
+import statistics   
 
 # Global variable.
 logger = None
@@ -284,6 +285,12 @@ class PathFinder:
         logger.info('Start sites: %s, end sites: %s', self._start_sites, self._end_sites)
         for end_site_index, trackers in result:
             logger.info('Trackers: %s, %s', end_site_index, list(zip(trackers, [self.site_ids(t.site_index) for t in trackers])))
+            site_path = self.get_site_path(trackers)
+            for ele in site_path:
+                logger.info(ele)
+            errors = list(zip(*site_path[:-1]))[-1]
+            logger.info('delta mean: %f', statistics.mean(errors))
+            logger.info('delta std: %f', statistics.stdev(errors))
         
 
     @staticmethod
@@ -379,6 +386,34 @@ class PathFinder:
             current_tracker = self._t_tensor[site_index][row][col]
         trackers.reverse()
         return trackers
+
+    @staticmethod
+    def _get_next_site(current_site, child_indexs):
+        sites = []
+        intervals = []
+        for child_index in child_indexs:
+            sites.append(current_site)
+            current_site, interval, _, _ = current_site.children[child_index]
+            intervals.append(interval)
+        return current_site, sites, intervals
+
+    def get_site_path(self, trackers):
+        result = []
+        bionano_index = 0
+        next_site = None
+        for tracker in trackers:
+            if next_site:
+                assert next_site.id == self.site_ids(tracker.site_index)
+            site_id = self.site_ids(tracker.site_index)
+            site = self._sites[site_id]
+            next_site, sub_site_path, sub_intervals = self._get_next_site(site, tracker.child_indexs)
+            bionano_sub_intervals = self._intervals[bionano_index: bionano_index + tracker.delta_x]
+            bionano_index += tracker.delta_x
+            error = sum(bionano_sub_intervals) - sum(sub_intervals)
+            result.append((site_id, tracker.child_indexs, sub_site_path, bionano_sub_intervals, sub_intervals, error))
+        last_site = next_site
+        result.append(last_site.id)
+        return result
 
     @staticmethod
     @njit
