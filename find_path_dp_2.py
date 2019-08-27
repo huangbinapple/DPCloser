@@ -33,6 +33,8 @@ HASH_B = 232423
 def poisson(lambda_, k):
     return math.exp(-lambda_) * lambda_ ** k / math.factorial(k)
 
+
+# @njit
 def find_none(ndarray):
     size = ndarray.shape[0]
     i = 0
@@ -247,7 +249,7 @@ class PathFinder:
         return result_fingerprints
 
     @staticmethod
-    @njit
+    # @njit
     def update_fingerprint(init_fingerprints, child_index):
         return (init_fingerprints + HASH_A) * (child_index + HASH_B)
     
@@ -416,7 +418,7 @@ class PathFinder:
         return result
 
     @staticmethod
-    @njit
+    # @njit
     def merge(values_a, values_b, fingerprints_a, fingerprints_b, n_valid_a, n_valid_b):
         size = values_a.shape[0]
         # logger.debug('n_valid_a: %d', n_valid_a)
