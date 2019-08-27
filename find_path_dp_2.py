@@ -253,13 +253,12 @@ class PathFinder:
     def find_path(self):
         logger.info('Finding optimal paths ...')
         log_sum = self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
-            self._site_ids, self._interval_index, self._propagation_index)
+            self._site_ids, self._interval_index, self._propagation_index, mini_prob=1e-5)
         self._log_sum += log_sum
         logger.info('Find paths complete, log sum is %f', self._log_sum)
 
         # Intergrate.
         end_site_indexs = np.array(list(map(self._site_id_to_index.get, self._end_sites)))
-        print(end_site_indexs[:10])
         final_probs = self._p_tensor[end_site_indexs, -1].flatten()
         final_trackers = self._t_tensor[end_site_indexs, -1].flatten()
         index_sort = final_probs.argsort()[::-1][:self._n_rank]
@@ -278,6 +277,8 @@ class PathFinder:
         logger.info('Final probs: %s', probs)
         result = []
         for end_site_index, tracker in zip(end_site_indexs, trackers):
+            logger.debug('Trace back from end_site_index: %d(%s)', end_site_index, self.site_ids(end_site_index))
+            logger.debug('First tracker: %s', tracker)
             if tracker:
                 result.append((self.site_ids(end_site_index), self.back_track(tracker, self.num_bionano_sites - 1)))
         logger.info('Start sites: %s, end sites: %s', self._start_sites, self._end_sites)
@@ -336,36 +337,32 @@ class PathFinder:
         # Action(Alter table.)
         for target_index, children_indexs_, propagate_result, fingerprints in zip(
                 target_indexs, children_indexs, propagate_results, updated_fingerprints):
-            tracker = T[target_index][index_iter + 1]
-            num_already_here = find_none(tracker)
             logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
-            logger.debug('num_already_here: %d', num_already_here)
-            logger.debug("Original P: %s", P[target_index][index_iter + 1])
-            logger.debug("Original F: %s", F[target_index][index_iter + 1])
-            logger.debug("Original T: %s", T[target_index][index_iter + 1])
             logger.debug("Children indexs: %s", children_indexs_)
             logger.debug("Propagate result: %s", propagate_result)
             logger.debug("Fingerprint: %s", fingerprints)
-            tracker_info = PathFinder.merge(P[target_index][index_iter + 1], propagate_result,
-                F[target_index][index_iter + 1], fingerprints, num_already_here, num_propagate)
-            # Update tracker.
-            tracker = tracker[:tracker_info.shape[0]]
-            tracker_keep_index = (tracker_info < num_already_here)
-            tracker[tracker_keep_index] = tracker[tracker_info[tracker_keep_index]]
-            tracker[~ tracker_keep_index] = tuple(map(
-                lambda x:
-                Tracker(
-                    site_index,
-                    (x - num_already_here) // num_propagate + 1,
-                    (x - num_already_here) % num_propagate,
-                    children_indexs_
-                ),
-                tracker_info[~ tracker_keep_index]
-            ))
-            logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
-            logger.debug("Altered P: %s", P[target_index][index_iter + 1])
-            logger.debug("Altered F: %s", F[target_index][index_iter + 1])
-            logger.debug("Altered T: %s", T[target_index][index_iter + 1])
+            for i in range(propagate_result.shape[0]):
+                logger.debug("i: %d", i)
+                tracker = T[target_index][index_iter + i + 1]
+                num_already_here = find_none(tracker)
+                logger.debug('num_already_here: %d', num_already_here)
+                logger.debug("Original P: %s", P[target_index][index_iter + i + 1])
+                logger.debug("Original F: %s", F[target_index][index_iter + i + 1])
+                logger.debug("Original T: %s", T[target_index][index_iter + i + 1])
+                tracker_info = PathFinder.merge(P[target_index][index_iter + i + 1], propagate_result[i],
+                    F[target_index][index_iter + i + 1], fingerprints, num_already_here, num_propagate)
+                # Update tracker.
+                tracker = tracker[:tracker_info.shape[0]]
+                tracker_keep_index = (tracker_info < num_already_here)
+                tracker[tracker_keep_index] = tracker[tracker_info[tracker_keep_index]]
+                tracker[~ tracker_keep_index] = tuple(map(
+                    lambda x: Tracker(site_index, i + 1, x - num_already_here, children_indexs_),
+                    tracker_info[~ tracker_keep_index]
+                ))
+                logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
+                logger.debug("Altered P: %s", P[target_index][index_iter + i + 1])
+                logger.debug("Altered F: %s", F[target_index][index_iter + i + 1])
+                logger.debug("Altered T: %s", T[target_index][index_iter + i + 1])
         logger.info('Propagation finished!')
 
     def back_track(self, init_tracker, row):
@@ -373,10 +370,12 @@ class PathFinder:
         current_tracker = init_tracker
         trackers = []
         while not current_tracker.is_start:
+            # print("C:", self.site_ids(current_tracker.site_index), current_tracker)
             trackers.append(current_tracker)
             site_index = current_tracker.site_index
             row -= current_tracker.delta_x
             col = current_tracker.y
+            # print('N:', site_index, row, col)
             current_tracker = self._t_tensor[site_index][row][col]
         trackers.reverse()
         return trackers
@@ -387,14 +386,12 @@ class PathFinder:
         size = values_a.shape[0]
         # logger.debug('n_valid_a: %d', n_valid_a)
         # logger.debug('n_valid_b: %d', n_valid_b)
-        assert len(values_b.shape) == 2
-        b_row = values_b.shape[0]
-        values_ab = np.concatenate((values_a[:n_valid_a], values_b[:, :n_valid_b].flatten()))
+        # logger.debug('values_a: %s', values_a)
+        # logger.debug('values_b: %s', values_b)
+        assert len(values_b.shape) == 1
+        values_ab = np.concatenate((values_a[:n_valid_a], values_b[:n_valid_b]))
         # logger.debug("value_ab: %s", values_ab)
-        fingerprints_b_repeat = np.empty((b_row, n_valid_b), dtype=np.uint64)
-        for i in range(b_row):
-            fingerprints_b_repeat[i] = fingerprints_b[:n_valid_b]
-        fingerprints_ab = np.concatenate((fingerprints_a[:n_valid_a], fingerprints_b_repeat.flatten()))
+        fingerprints_ab = np.concatenate((fingerprints_a[:n_valid_a], fingerprints_b[:n_valid_b]))
         # logger.debug("fingerprints_ab: %s", fingerprints_ab)
         index_sort = (-values_ab).argsort(kind='mergesort')  # Descend order.
         # logger.debug("index_sort: %s", index_sort)
@@ -455,7 +452,7 @@ class PathFinder:
 
     def index_intervals(self):
         logger.info('Indexing intervals...')
-        intervals_ = self._intervals[::-1]
+        intervals_ = self._intervals
         result = []
         for i in range(len(intervals_)):
             interval = 0
@@ -470,7 +467,7 @@ class PathFinder:
                 fp_scores.append(fp_score)
                 logger.debug('Prob of FN=%d in %d is %f', num_insert, interval, fp_score)
             result.append((np.array(intervals), np.array(fp_scores)))
-            self._interval_index = result[::-1]
+            self._interval_index = result
         logger.info('Index intervals done.')
         logger.debug('Interval index: %s', self._interval_index)
 
