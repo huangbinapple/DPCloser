@@ -256,7 +256,7 @@ class PathFinder:
     def find_path(self):
         logger.info('Finding optimal paths ...')
         log_sum = self._find_path(self._p_tensor, self._t_tensor, self._f_tensor,
-            self._site_ids, self._interval_index, self._propagation_index, mini_prob=1e-5)
+            self._site_ids, self._interval_index, self._propagation_index, mini_prob=0)
         self._log_sum += log_sum
         logger.info('Find paths complete, log sum is %f', self._log_sum)
 
@@ -309,7 +309,7 @@ class PathFinder:
 
     @staticmethod
     # @njit
-    def _find_path(P, T, F, site_ids, interval_index, propagate_index, mini_prob=0):
+    def _find_path(P, T, F, site_ids, interval_index, propagate_index, mini_prob=1e-5):
         index_iter = 0
         total_iter = len(interval_index)
         log_sum = 0
@@ -334,10 +334,10 @@ class PathFinder:
     # @njit
     def propagate(P, T, F, site_ids, site_index, index_iter, interval_index_content, propogate_index_content):
         # Input.
-        site_id = site_ids[site_index]
-        logger.info('(Iter: %d) Propagating from site %s...', index_iter, site_id)
+        # site_id = site_ids[site_index]
+        # logger.info('(Iter: %d) Propagating from site %s...', index_iter, site_id)
         num_propagate = find_none(T[site_index][index_iter])
-        logger.debug("num_propagate: %d", num_propagate)
+        # logger.debug("num_propagate: %d", num_propagate)
         init_probs = P[site_index][index_iter]
         init_fingerprints = F[site_index][index_iter]
         target_indexs, children_indexs, reference_lengths, fn_scores = propogate_index_content
@@ -345,32 +345,37 @@ class PathFinder:
 
         propagate_factor = PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths) * \
             fn_scores.reshape(-1, 1) * fp_scores
-        logger.debug('Defactor propagate factor:')
-        logger.debug('reference lengths: %s', reference_lengths.reshape(-1, 1))
-        logger.debug('Bionano lengths: %s', bionano_lengths)
-        logger.debug('Similate factor: %s', PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths))
-        logger.debug('fn_scores: %s', fn_scores.reshape(-1, 1))
-        logger.debug('fp_scores: %s', fp_scores)
-        logger.debug('Propagate factors: %s', propagate_factor)
+        # logger.debug('Defactor propagate factor:')
+        # logger.debug('reference lengths: %s', reference_lengths.reshape(-1, 1))
+        # logger.debug('Bionano lengths: %s', bionano_lengths)
+        # logger.debug('Similate factor: %s', PathFinder.similar_factor(reference_lengths.reshape(-1, 1), bionano_lengths))
+        # logger.debug('fn_scores: %s', fn_scores.reshape(-1, 1))
+        # logger.debug('fp_scores: %s', fp_scores)
+        # logger.debug('Propagate factors: %s', propagate_factor)
         propagate_results = np.expand_dims(propagate_factor, axis=-1) * init_probs
         updated_fingerprints = PathFinder.propagate_fingerprints(init_fingerprints, children_indexs)
 
         # Action(Alter table.)
         for target_index, children_indexs_, propagate_result, fingerprints in zip(
                 target_indexs, children_indexs, propagate_results, updated_fingerprints):
-            logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
-            logger.debug("Children indexs: %s", children_indexs_)
-            logger.debug("Propagate result: %s", propagate_result)
-            logger.debug("Fingerprint: %s", fingerprints)
+            # logger.debug("Alter table operation, target site id %s:", site_ids[target_index])
+            # logger.debug("Children indexs: %s", children_indexs_)
+            # logger.debug("Propagate result: %s", propagate_result)
+            # logger.debug("Fingerprint: %s", fingerprints)
             for i in range(propagate_result.shape[0]):
                 logger.debug("i: %d", i)
                 tracker = T[target_index][index_iter + i + 1]
                 num_already_here = find_none(tracker)
-                logger.debug('num_already_here: %d', num_already_here)
-                logger.debug("Original P: %s", P[target_index][index_iter + i + 1])
-                logger.debug("Original F: %s", F[target_index][index_iter + i + 1])
-                logger.debug("Original T: %s", T[target_index][index_iter + i + 1])
-                tracker_info = PathFinder.merge(P[target_index][index_iter + i + 1], propagate_result[i],
+                new = propagate_result[i]
+                old = P[target_index][index_iter + i + 1]
+                # logger.debug('num_already_here: %d', num_already_here)
+                # logger.debug("Original P: %s", P[target_index][index_iter + i + 1])
+                # logger.debug("Original F: %s", F[target_index][index_iter + i + 1])
+                # logger.debug("Original T: %s", T[target_index][index_iter + i + 1])
+                if tracker[-1] is not None and old[-1] > new[0]:
+                    # print('haha')
+                    continue
+                tracker_info = PathFinder.merge(old, new,
                     F[target_index][index_iter + i + 1], fingerprints, num_already_here, num_propagate)
                 # Update tracker.
                 tracker = tracker[:tracker_info.shape[0]]
@@ -380,11 +385,11 @@ class PathFinder:
                     lambda x: Tracker(site_index, i + 1, x - num_already_here, children_indexs_),
                     tracker_info[~ tracker_keep_index]
                 ))
-                logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
-                logger.debug("Altered P: %s", P[target_index][index_iter + i + 1])
-                logger.debug("Altered F: %s", F[target_index][index_iter + i + 1])
-                logger.debug("Altered T: %s", T[target_index][index_iter + i + 1])
-        logger.info('Propagation finished!')
+        #         logger.debug("Finish a alter table operation, tracker info: %s", tracker_info)
+        #         logger.debug("Altered P: %s", P[target_index][index_iter + i + 1])
+        #         logger.debug("Altered F: %s", F[target_index][index_iter + i + 1])
+        #         logger.debug("Altered T: %s", T[target_index][index_iter + i + 1])
+        # logger.info('Propagation finished!')
 
     def back_track(self, init_tracker, row):
         row = row
@@ -440,7 +445,7 @@ class PathFinder:
         # logger.debug('n_valid_b: %d', n_valid_b)
         # logger.debug('values_a: %s', values_a)
         # logger.debug('values_b: %s', values_b)
-        assert len(values_b.shape) == 1
+        # assert len(values_b.shape) == 1
         values_ab = np.concatenate((values_a[:n_valid_a], values_b[:n_valid_b]))
         # logger.debug("value_ab: %s", values_ab)
         fingerprints_ab = np.concatenate((fingerprints_a[:n_valid_a], fingerprints_b[:n_valid_b]))
@@ -517,11 +522,11 @@ class PathFinder:
                 intervals.append(interval)
                 fp_score = poisson(interval / AVERAGE_INTERVAL, num_insert)
                 fp_scores.append(fp_score)
-                logger.debug('Prob of FN=%d in %d is %f', num_insert, interval, fp_score)
+                # logger.debug('Prob of FN=%d in %d is %f', num_insert, interval, fp_score)
             result.append((np.array(intervals), np.array(fp_scores)))
             self._interval_index = result
-        logger.info('Index intervals done.')
-        logger.debug('Interval index: %s', self._interval_index)
+        # logger.info('Index intervals done.')
+        # logger.debug('Interval index: %s', self._interval_index)
 
 def main():
     global MU
